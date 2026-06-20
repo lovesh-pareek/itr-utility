@@ -1,0 +1,181 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #f5f5f7;
+    --color-surface: #ffffff;
+    --color-surface-raised: #fafafa;
+    --color-border: #e8e8ec;
+    --color-border-strong: #c9c9d3;
+    --color-ink: #0f1117;
+    --color-ink-secondary: #4d4d62;
+    --color-ink-muted: #9d9daf;
+    --color-amber: #f59e0b;
+    --color-amber-bg: #fffbeb;
+    --color-emerald: #10b981;
+    --color-emerald-bg: #ecfdf5;
+    --color-rose: #f43f5e;
+    --color-rose-bg: #fff1f2;
+    --color-sky: #0ea5e9;
+    --color-sky-bg: #f0f9ff;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: 'DM Sans', sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Syne', sans-serif;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+
+  code, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  /* Card */
+  .card {
+    @apply bg-white border border-[var(--color-border)] rounded-xl p-5;
+  }
+
+  .card-raised {
+    @apply bg-white border border-[var(--color-border)] rounded-xl p-5 shadow-sm;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 bg-ink-900 text-white font-medium px-5 py-2.5 rounded-lg
+           hover:bg-ink-700 active:bg-ink-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 bg-white border border-[var(--color-border-strong)] text-ink-700
+           font-medium px-5 py-2.5 rounded-lg hover:bg-ink-50 active:bg-ink-100 transition-colors
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 text-ink-600 font-medium px-3 py-1.5 rounded-lg
+           hover:bg-ink-100 active:bg-ink-200 transition-colors;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-600
+           font-medium px-5 py-2.5 rounded-lg hover:bg-rose-100 transition-colors;
+  }
+
+  /* Warning banners */
+  .banner-info {
+    @apply flex gap-3 bg-sky-50 border border-sky-200 text-sky-800 rounded-lg px-4 py-3 text-sm;
+  }
+
+  .banner-warn {
+    @apply flex gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-4 py-3 text-sm;
+  }
+
+  .banner-error {
+    @apply flex gap-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg px-4 py-3 text-sm;
+  }
+
+  .banner-success {
+    @apply flex gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg px-4 py-3 text-sm;
+  }
+
+  /* Form inputs */
+  .input-field {
+    @apply w-full border border-[var(--color-border-strong)] rounded-lg px-3 py-2
+           text-ink-900 bg-white focus:outline-none focus:ring-2 focus:ring-ink-900 focus:border-transparent
+           placeholder:text-ink-300 text-sm font-mono;
+  }
+
+  /* Schedule tab */
+  .schedule-tab {
+    @apply px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer;
+  }
+
+  .schedule-tab-active {
+    @apply bg-ink-900 text-white;
+  }
+
+  .schedule-tab-inactive {
+    @apply text-ink-500 hover:text-ink-900 hover:bg-ink-100;
+  }
+
+  /* Label */
+  .field-label {
+    @apply text-xs font-medium uppercase tracking-wider text-ink-400;
+  }
+
+  /* Rupee amount */
+  .amount {
+    @apply font-mono text-ink-900;
+  }
+
+  .amount-muted {
+    @apply font-mono text-ink-400;
+  }
+
+  /* Overridden field indicator */
+  .overridden {
+    @apply underline decoration-amber-400 decoration-2 underline-offset-2;
+  }
+}
+
+/* Progress bar animation */
+@keyframes progress-fill {
+  from { width: 0% }
+  to { width: var(--progress-width) }
+}
+
+.progress-bar {
+  animation: progress-fill 0.4s ease-out forwards;
+}
+
+/* Fade in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fade-in 0.2s ease-out forwards;
+}
+
+/* Checkmark pulse */
+@keyframes check-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.check-pop {
+  animation: check-pop 0.25s ease-out forwards;
+}
+
+/* Scroll without visible scrollbar */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

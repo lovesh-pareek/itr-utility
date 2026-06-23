@@ -1,0 +1,67 @@
+{
+  "documents": [
+    {
+      "id": "brokerPL",
+      "label": "Broker Tax P&L",
+      "required": true,
+      "multiple": false,
+      "maxCount": 1,
+      "formats": [".xlsx"],
+      "hint": "Zerodha / Groww / Upstox → Console → Tax P&L",
+      "parsedBadge": "broker_name_detected",
+      "errorOnMissing": "Required to compute capital gains and intraday income"
+    },
+    {
+      "id": "form16",
+      "label": "Form 16",
+      "required": true,
+      "multiple": true,
+      "maxCount": 5,
+      "formats": [".pdf"],
+      "hint": "From employer — text-based only. Add one per employer.",
+      "parsedBadge": "employer_name_detected",
+      "addMoreLabel": "Add another Form 16",
+      "errorOnMissing": "Required to compute salary income and TDS"
+    },
+    {
+      "id": "mfStatement",
+      "label": "MF Capital Gains Statement",
+      "required": false,
+      "multiple": false,
+      "maxCount": 1,
+      "formats": [".json", ".pdf"],
+      "hint": "CAMS / KFintech — JSON format preferred",
+      "parsedBadge": "scheme_count_detected"
+    },
+    {
+      "id": "form26AS",
+      "label": "Form 26AS",
+      "required": false,
+      "multiple": false,
+      "maxCount": 1,
+      "formats": [".pdf", ".xlsx"],
+      "hint": "TRACES → View 26AS → Download",
+      "parsedBadge": "tds_entry_count"
+    },
+    {
+      "id": "ais",
+      "label": "AIS / TIS",
+      "required": false,
+      "multiple": false,
+      "maxCount": 1,
+      "formats": [".json", ".pdf"],
+      "hint": "IT portal → AIS → Download JSON",
+      "parsedBadge": "ais_salary_detected"
+    },
+    {
+      "id": "previousITR",
+      "label": "Previous Year ITR XML",
+      "required": false,
+      "multiple": false,
+      "maxCount": 1,
+      "formats": [".xml"],
+      "hint": "Your AY 2025-26 filed ITR XML — for carry-forward losses",
+      "parsedBadge": "cfl_entry_count"
+    }
+  ]
+}

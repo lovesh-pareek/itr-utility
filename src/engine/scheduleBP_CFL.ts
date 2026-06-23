@@ -1,4 +1,5 @@
 import type { BrokerData, ScheduleBP, ScheduleCYLA, ScheduleCFL } from '../types'
+import { getRules } from './taxRules'
 
 /**
  * Compute Schedule BP — Intraday speculative business income.
@@ -27,19 +28,26 @@ export function computeScheduleBP(
 /**
  * Compute Schedule CFL — Carry Forward Losses from current year.
  *
- * Rules:
- *   - Unabsorbed speculative (intraday) loss: carry forward up to 4 AYs
- *   - Unabsorbed short-term capital loss: carry forward up to 8 AYs
- *   - Unabsorbed long-term capital loss: carry forward up to 8 AYs
+ * Rules (from config carryForward limits):
+ *   - Unabsorbed speculative (intraday) loss: carry forward up to speculativeLoss AYs
+ *   - Unabsorbed short-term capital loss: carry forward up to capitalLoss AYs
+ *   - Unabsorbed long-term capital loss: carry forward up to capitalLoss AYs
  *
- * Carry forward is ONLY valid if ITR is filed before 31 July 2026.
+ * Carry forward is ONLY valid if ITR is filed before the original deadline.
  */
-export function computeScheduleCFL(cylaOutput: ScheduleCYLA): ScheduleCFL {
+export function computeScheduleCFL(
+  cylaOutput: ScheduleCYLA,
+  ay = '2026-27'
+): ScheduleCFL {
+  const rules = getRules(ay, 'new')  // carryForward limits are regime-independent
+  const deadlines = rules.deadlines
+
   return {
     intradayLossCarryForward: cylaOutput.setOffs.remainingIntradayLoss,
     stclCarryForward:         cylaOutput.setOffs.remainingSTCL,
     ltclCarryForward:         cylaOutput.setOffs.remainingLTCL,
-    targetAY:                 '2027-28',
+    targetAY:                 getTargetAY(ay),
+    deadlineForCFL:           deadlines.original,
   }
 }
 
@@ -53,4 +61,17 @@ export function finaliseBP(bp: ScheduleBP, cfl: ScheduleCFL): ScheduleBP {
     setOffThisYear: 0,   // intraday loss cannot be set off against any other head
     carryForward: cfl.intradayLossCarryForward,
   }
+}
+
+/**
+ * Get the target AY for carry forward (current AY + 1).
+ * e.g. "2026-27" → "2027-28"
+ */
+function getTargetAY(ay: string): string {
+  const match = ay.match(/^(\d{4})-(\d{2,4})$/)
+  if (!match) return ay
+  const startYear = parseInt(match[1])
+  const endShort = parseInt(match[2])
+  const endYear = endShort < 100 ? Math.floor(startYear / 100) * 100 + endShort : endShort
+  return `${startYear + 1}-${String(endYear + 1).slice(-2)}`
 }

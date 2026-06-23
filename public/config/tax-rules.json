@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1.0",
+  "defaultAY": "2026-27",
+  "rules": {
+    "2026-27": {
+      "regime": {
+        "new": {
+          "slabs": [
+            { "from": 0, "to": 400000, "rate": 0 },
+            { "from": 400000, "to": 800000, "rate": 0.05 },
+            { "from": 800000, "to": 1200000, "rate": 0.10 },
+            { "from": 1200000, "to": 1600000, "rate": 0.15 },
+            { "from": 1600000, "to": 2000000, "rate": 0.20 },
+            { "from": 2000000, "to": 2400000, "rate": 0.25 },
+            { "from": 2400000, "to": null, "rate": 0.30 }
+          ],
+          "standardDeductionSalary": 75000,
+          "section87A": { "limit": 1200000, "appliesToCG": false },
+          "surcharge": [
+            { "from": 5000000, "to": 10000000, "rate": 0.10 },
+            { "from": 10000000, "to": 20000000, "rate": 0.15 },
+            { "from": 20000000, "to": null, "rate": 0.25 }
+          ],
+          "surchargeCapForCG": 0.15
+        },
+        "old": {
+          "slabs": [
+            { "from": 0, "to": 250000, "rate": 0 },
+            { "from": 250000, "to": 500000, "rate": 0.05 },
+            { "from": 500000, "to": 1000000, "rate": 0.20 },
+            { "from": 1000000, "to": null, "rate": 0.30 }
+          ],
+          "slabs_senior": [
+            { "from": 0, "to": 300000, "rate": 0 },
+            { "from": 300000, "to": 500000, "rate": 0.05 },
+            { "from": 500000, "to": 1000000, "rate": 0.20 },
+            { "from": 1000000, "to": null, "rate": 0.30 }
+          ],
+          "slabs_super_senior": [
+            { "from": 0, "to": 500000, "rate": 0 },
+            { "from": 500000, "to": 1000000, "rate": 0.20 },
+            { "from": 1000000, "to": null, "rate": 0.30 }
+          ],
+          "standardDeductionSalary": 75000,
+          "section87A": { "limit": 500000, "maxRebate": 12500, "appliesToCG": false },
+          "surcharge": [
+            { "from": 5000000, "to": 10000000, "rate": 0.10 },
+            { "from": 10000000, "to": 20000000, "rate": 0.15 },
+            { "from": 20000000, "to": 50000000, "rate": 0.25 },
+            { "from": 50000000, "to": null, "rate": 0.37 }
+          ],
+          "deductionCaps": {
+            "80C": 150000,
+            "80CCD1B": 50000,
+            "80D_self": 25000,
+            "80D_parents": 25000,
+            "80D_senior_self": 50000,
+            "80D_senior_parents": 50000,
+            "80G_cash_limit": 2000,
+            "80GG_monthly": 5000,
+            "80TTA": 10000,
+            "80TTB": 50000,
+            "24b_selfOccupied": 200000,
+            "familyPensionStdDed": 15000,
+            "familyPensionStdDedPct": 0.333
+          }
+        }
+      },
+      "specialRates": {
+        "stcg_111A": 0.20,
+        "ltcg_112A": 0.125,
+        "ltcg_112A_exemption": 125000,
+        "lottery": 0.30,
+        "casualIncome": 0.30,
+        "debt_mf": "slab",
+        "dividends": "slab"
+      },
+      "cess": 0.04,
+      "carryForward": {
+        "speculativeLoss": 4,
+        "capitalLoss": 8,
+        "hpLoss": 8,
+        "businessLoss": 8
+      },
+      "deadlines": {
+        "original": "2026-07-31",
+        "revised": "2026-12-31",
+        "belated": "2026-12-31"
+      },
+      "itrForms": {
+        "ITR1": "Salary + up to 1 HP + OS, total income ≤ 50L, no CG, no business",
+        "ITR2": "CG + multiple HP + foreign income, no business",
+        "ITR3": "Business/profession including speculative intraday or F&O",
+        "ITR4": "Presumptive taxation u/s 44AD/44ADA/44AE only"
+      },
+      "surchargeThresholds": {
+        "scheduleALRequired": 5000000
+      }
+    }
+  }
+}

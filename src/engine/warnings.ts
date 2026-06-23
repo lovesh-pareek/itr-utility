@@ -1,19 +1,20 @@
 import type { AppState, Warning, Schedules, TaxComputation } from '../types'
-
-const FILING_DEADLINE = new Date('2026-07-31T23:59:59')
-const SURCHARGE_THRESHOLD = 5_000_000   // ₹50L
+import { getRules } from './taxRules'
 
 /**
  * Evaluate all warning conditions and return triggered warnings only.
- * Every warning from requirements.md §7 is checked here.
- * Order matters — most critical first.
+ * All thresholds read from tax-rules.json via getRules().
  */
 export function computeWarnings(
   state: Pick<AppState, 'parsed' | 'parseStatus' | 'aiCallLog'>,
   schedules: Schedules | null,
-  tax: TaxComputation | null
+  tax: TaxComputation | null,
+  ay = '2026-27'
 ): Warning[] {
   const warnings: Warning[] = []
+  const rules = getRules(ay, 'new')  // surcharge threshold is regime-independent
+  const SURCHARGE_THRESHOLD = rules.surchargeThresholds.scheduleALRequired
+  const FILING_DEADLINE = new Date(rules.deadlines.original + 'T23:59:59')
 
   // ── 1. AIS mismatch risk — ALWAYS shown ──────────────────────────────────
   warnings.push({
@@ -94,12 +95,12 @@ export function computeWarnings(
     }
 
     // ── 8. LTCG exemption cap ─────────────────────────────────────────────────
-    if (schedules.CG.grossLTCG > 125_000) {
+    const ltcgExemptionLimit = rules.specialRates.ltcg_112A_exemption
+    if (schedules.CG.grossLTCG > ltcgExemptionLimit) {
       warnings.push({
         id: 'LTCG_EXEMPTION_CAP',
         severity: 'info',
-        message:
-          'LTCG above ₹1,25,000 is taxable at 12.5% (Sec 112A). Section 87A rebate does not apply to LTCG.',
+        message: `LTCG above ₹${(ltcgExemptionLimit / 100000).toFixed(2).replace('.00', '')}L is taxable at ${rules.specialRates.ltcg_112A * 100}% (Sec 112A). Section 87A rebate does not apply to LTCG.`,
         scheduleRef: 'CG',
       })
     }
@@ -126,9 +127,7 @@ export function computeWarnings(
     })
   }
 
-  // ── 11. XML schema error — added dynamically when XML validation fails ────
-  // XML_SCHEMA_ERROR is pushed directly by the XML generator / S06 screen.
-  // computeWarnings checks for it via the parseStatus errors map.
+  // ── 11. XML schema error ──────────────────────────────────────────────────
   if (state.parseStatus.errors['xml_schema']) {
     warnings.push({
       id: 'XML_SCHEMA_ERROR',

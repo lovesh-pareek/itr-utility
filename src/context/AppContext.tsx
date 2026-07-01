@@ -218,6 +218,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         parseStatus_v2: { ...state.parseStatus_v2, previousITR: 'done' },
       }
 
+    case 'SET_SELECTED_AY':
+      return { ...state, selectedAY: action.ay }
+
     case 'SET_SELECTED_REGIME':
       return { ...state, selectedRegime: action.regime }
 

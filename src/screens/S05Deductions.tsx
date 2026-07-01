@@ -1,3 +1,4 @@
+import React from 'react'
 /**
  * S05 Deductions Screen
  * New Regime: only 80CCD(2) and 80CCH shown; rest greyed.
@@ -130,6 +131,24 @@ export function S05Deductions() {
               value={raw.sec80E} onChange={v => setField('sec80E', v)} />
           </div>
 
+          {/* 80EEA */}
+          <div className="card">
+            <DeductionField label="80EEA — First home loan interest" subLabel="Affordable housing · Cap ₹1,50,000"
+              value={raw.sec80EEA} onChange={v => setField('sec80EEA', v)} />
+          </div>
+
+          {/* 80GG */}
+          <div className="card">
+            <DeductionField label="80GG — HRA (no HRA in salary)" subLabel="Cap ₹5,000/month = ₹60,000 annual"
+              value={raw.sec80GG} onChange={v => setField('sec80GG', v)} />
+          </div>
+
+          {/* 80G Donations */}
+          <div className="card">
+            <p className="text-sm font-semibold text-ink-900 mb-2">Section 80G — Donations</p>
+            <DonationRows raw={raw} setRaw={setRaw} />
+          </div>
+
           {/* 80TTA / 80TTB */}
           <div className="card">
             {(fc === 'senior' || fc === 'super_senior') ? (
@@ -189,6 +208,70 @@ function CapBar({ pct }: { pct: number }) {
     <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
       <div className={`h-full rounded-full transition-all ${w >= 100 ? 'bg-emerald-500' : 'bg-brand-500'}`}
         style={{ width: `${w}%` }} />
+    </div>
+  )
+}
+
+// ─── Donation Rows (80G) ────────────────────────────────────────────────────
+
+function DonationRows({ raw, setRaw }: { raw: RawDeductions; setRaw: React.Dispatch<React.SetStateAction<RawDeductions>> }) {
+  const donations = raw.sec80G ?? []
+
+  function add() {
+    setRaw(prev => ({
+      ...prev,
+      sec80G: [...(prev.sec80G ?? []), { institution: '', amount: 0, cashAmount: 0, deductiblePct: 0.5 as 0.5 | 1.0 }],
+    }))
+  }
+
+  function update(i: number, key: string, val: any) {
+    setRaw(prev => {
+      const next = [...(prev.sec80G ?? [])]
+      next[i] = { ...next[i], [key]: val }
+      return { ...prev, sec80G: next }
+    })
+  }
+
+  function remove(i: number) {
+    setRaw(prev => ({ ...prev, sec80G: (prev.sec80G ?? []).filter((_, j) => j !== i) }))
+  }
+
+  return (
+    <div className="space-y-2">
+      {donations.map((d: any, i: number) => (
+        <div key={i} className="border border-ink-100 rounded-lg p-3 space-y-2">
+          <input value={d.institution} onChange={e => update(i, 'institution', e.target.value)}
+            placeholder="Institution name" className="w-full text-sm border border-ink-200 rounded px-2 py-1" />
+          <div className="flex gap-2 items-center">
+            <div className="flex-1">
+              <label className="text-xs text-ink-500">Amount ₹</label>
+              <input type="number" min={0} value={d.amount || ''}
+                onChange={e => update(i, 'amount', parseFloat(e.target.value) || 0)}
+                className="w-full text-sm border border-ink-200 rounded px-2 py-1" />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-ink-500">Cash portion ₹ (max ₹2,000)</label>
+              <input type="number" min={0} max={2000} value={d.cashAmount || ''}
+                onChange={e => update(i, 'cashAmount', Math.min(2000, parseFloat(e.target.value) || 0))}
+                className="w-full text-sm border border-ink-200 rounded px-2 py-1" />
+            </div>
+            <div>
+              <label className="text-xs text-ink-500">Deductible</label>
+              <select value={d.deductiblePct}
+                onChange={e => update(i, 'deductiblePct', parseFloat(e.target.value) as 0.5 | 1.0)}
+                className="w-full text-sm border border-ink-200 rounded px-2 py-1">
+                <option value={1.0}>100%</option>
+                <option value={0.5}>50%</option>
+              </select>
+            </div>
+          </div>
+          <button onClick={() => remove(i)} className="text-xs text-rose-500 hover:underline">Remove</button>
+        </div>
+      ))}
+      <button onClick={add} className="text-xs text-brand-600 hover:underline">+ Add donation</button>
+      {donations.length > 0 && (
+        <p className="text-xs text-ink-400">Cash donations above ₹2,000 are not eligible for 80G deduction.</p>
+      )}
     </div>
   )
 }

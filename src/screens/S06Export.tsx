@@ -11,6 +11,7 @@ export default function S06Export() {
   const [pdfState, setPdfState] = useState<BtnState>('idle')
   const [xmlState, setXmlState] = useState<BtnState>('idle')
   const [xmlErrors, setXmlErrors] = useState<string[]>([])
+  const [regimePdfState, setRegimePdfState] = useState<BtnState>('idle')
 
   const hasData = !!(state.tax && state.schedules)
 
@@ -18,8 +19,8 @@ export default function S06Export() {
     if (!state.tax || !state.schedules || !state.parsed.form16) return
     setPdfState('generating')
     try {
-      const { generateTaxSummaryPDF } = await import('../output/pdfGenerator')
-      await generateTaxSummaryPDF(state)
+      const { generateTaxSummaryPDF_v2 } = await import('../output/pdfGenerator')
+      await generateTaxSummaryPDF_v2(state)
       setPdfState('done')
     } catch (err) {
       console.error(err)
@@ -44,7 +45,7 @@ export default function S06Export() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'itr3_ay2026_27.xml'
+      a.download = `${(state.selectedITRForm ?? 'ITR3').toLowerCase()}_ay2026_27.xml`
       a.click()
       URL.revokeObjectURL(url)
       setXmlState('done')
@@ -54,10 +55,22 @@ export default function S06Export() {
     }
   }
 
+  async function handleRegimePDF() {
+    setRegimePdfState('generating')
+    try {
+      const { generateRegimeComparisonPDF } = await import('../output/pdfGenerator')
+      await generateRegimeComparisonPDF(state)
+      setRegimePdfState('done')
+    } catch (err) {
+      console.error(err)
+      setRegimePdfState('error')
+    }
+  }
+
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">Your ITR-3 data is ready</h1>
+        <h1 className="text-2xl font-bold text-ink-900 mb-1">Your {state.selectedITRForm ?? 'ITR3'} data is ready</h1>
         <p className="text-sm text-ink-400">Download both files, then upload the XML on the portal</p>
       </div>
 
@@ -103,7 +116,7 @@ export default function S06Export() {
           <div className="flex items-center gap-3 mb-3">
             <span className="text-xl">📋</span>
             <div>
-              <p className="font-medium text-ink-900">{state.selectedITRForm ?? 'ITR3'} XML — AY 2026-27 — AY 2026-27</p>
+              <p className="font-medium text-ink-900">{state.selectedITRForm ?? 'ITR3'} XML — AY 2026-27</p>
               <p className="text-xs text-ink-400">Upload this on incometax.gov.in to pre-fill your return</p>
             </div>
           </div>
@@ -141,6 +154,34 @@ export default function S06Export() {
             </div>
           )}
         </div>
+
+        {/* Regime Comparison PDF */}
+        {state.regimeComparison && (
+          <div className="card">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-xl">📊</span>
+              <div>
+                <p className="font-medium text-ink-900">Regime Comparison — PDF</p>
+                <p className="text-xs text-ink-400">Old vs New Regime side-by-side, with recommendation</p>
+              </div>
+            </div>
+            <button
+              onClick={handleRegimePDF}
+              disabled={regimePdfState === 'generating'}
+              className="btn-secondary"
+            >
+              {regimePdfState === 'generating' ? (
+                <><SpinnerInline /> Generating…</>
+              ) : regimePdfState === 'done' ? (
+                <>✓ Downloaded</>
+              ) : regimePdfState === 'error' ? (
+                <>⚠ Error — try again</>
+              ) : (
+                <><DownloadIcon /> Download PDF</>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Portal steps */}
@@ -152,8 +193,8 @@ export default function S06Export() {
           {[
             'Go to incometax.gov.in → Login',
             'e-File → Income Tax Returns → File ITR',
-            'Select AY 2026-27 → ITR-3 → Upload XML',
-            'Select the downloaded itr3_ay2026_27.xml file',
+            `Select AY 2026-27 → ${state.selectedITRForm ?? 'ITR-3'} → Upload XML`,
+            `Select the downloaded ${(state.selectedITRForm ?? 'ITR3').toLowerCase()}_ay2026_27.xml file`,
             'Review all pre-filled values on portal',
             'Verify against your AIS before confirming',
             'Submit and e-verify',

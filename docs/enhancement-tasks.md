@@ -41,10 +41,10 @@ On every session start:
 ```
 last_session_start: June 2026
 last_session_end:   June 2026
-last_task_worked:   T71
-current_wave:       11 (open)
-completed_tasks:    5 / 38
-notes:              Wave 10 complete (T65–T71). completed and validattion pending Test file created under engine wave11.test.ts created but execution pending. Yet to complete the Wave 11.
+last_task_worked:   gap-fixes
+current_wave:       15 (complete + audit fixes)
+completed_tasks:    38 / 38
+notes:              ALL 38 TASKS COMPLETE + post-completion gap audit fixed. Audit found: PDF v2 incomplete, ITR1/ITR4 XML stubs only, S05 missing 80GG/80G/80EEA, S04 OS tab missing v2 fields, no multi-employer/presumptive UI, no AddPropertyModal, broken SET_SELECTED_AY dispatch (dead action), no ITR form override in Settings. ALL FIXED: generateTaxSummaryPDF_v2 + generateRegimeComparisonPDF complete, generateITR1XML + generateITR4XML built and routed in generateXML_v2, S05 full Chapter VI-A (80GG/80EEA/80G donation rows), S04 OS tab all 7 v2 fields, S04 Salary tab multi-employer cards, S04 Business tab presumptive income cards, S04 HP tab functional Add Property form wired to computeScheduleHP, SET_SELECTED_AY reducer case + action type added, S08 Settings ITR form override dropdown added. 296 tests passing (14 new gap-fix tests), zero TS errors, production build clean.
 ```
 
 ---
@@ -149,7 +149,7 @@ blocks:       Wave 11
 
 ### T65 · Types: expand income model [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   Wave 10 complete
 blocks:       T66, T67, T68, T69, T70
@@ -441,7 +441,7 @@ blocks:       Wave 12
 
 ### T72 · Types + engine: Chapter VI-A deductions [parallel:yes]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   Wave 11 complete
 blocks:       T74
@@ -456,7 +456,7 @@ blocks:       T74
 
 ### T73 · Types + engine: tax credits [parallel:yes]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   Wave 11 complete
 blocks:       T74
@@ -471,7 +471,7 @@ blocks:       T74
 
 ### T74 · Wire deductions + credits into tax engine [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     1h
 depends_on:   T72, T73
 blocks:       Wave 13
@@ -497,7 +497,7 @@ blocks:       Wave 13
 
 ### T75 · Form 26AS parser [parallel:yes]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   Wave 12 complete
 blocks:       T78
@@ -512,7 +512,7 @@ blocks:       T78
 
 ### T76 · AIS JSON parser + cross-validation engine [parallel:yes]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     3h
 depends_on:   Wave 12 complete
 blocks:       T78
@@ -527,7 +527,7 @@ blocks:       T78
 
 ### T77 · Prior ITR XML parser [parallel:yes]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   Wave 12 complete
 blocks:       T78
@@ -542,7 +542,7 @@ blocks:       T78
 
 ### T78 · S02 document hub v2 + S03 parsing progress v2 [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T75, T76, T77
 blocks:       Wave 14
@@ -566,7 +566,7 @@ blocks:       Wave 14
 
 ### T79 · AppState v2 — expand state shape and persistence [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   Wave 13 complete
 blocks:       T80, T81
@@ -580,9 +580,9 @@ blocks:       T80, T81
 
 ---
 
-### T80 · Engine: regime comparison [parallel:no]
+ [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T79
 blocks:       T81
@@ -595,9 +595,9 @@ blocks:       T81
 
 ---
 
-### T81 · Navigation flow update + StepProgress v2 [parallel:no]
+ + StepProgress v2 [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     1h
 depends_on:   T79, T80
 blocks:       Wave 15
@@ -621,7 +621,7 @@ blocks:       Wave 15
 
 ### T82 · S04 Income hub — 5-tab screen [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     4h
 depends_on:   Wave 14 complete
 blocks:       T83
@@ -637,7 +637,7 @@ blocks:       T83
 
 ### T83 · S05 Deductions screen [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T82
 blocks:       T84
@@ -654,7 +654,7 @@ blocks:       T84
 
 ### T84 · S06 Regime comparison screen [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T83
 blocks:       T85
@@ -669,7 +669,7 @@ blocks:       T85
 
 ### T85 · S07 AIS validation screen [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T84
 blocks:       T86
@@ -684,7 +684,7 @@ blocks:       T86
 
 ### T86 · S12 Bank accounts screen [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T85
 blocks:       T87
@@ -700,7 +700,7 @@ blocks:       T87
 
 ### T87 · S08 Tax summary v2 + S09 Export v2 [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T91
 blocks:       T88
@@ -714,7 +714,7 @@ blocks:       T88
 
 ### T91 · S13 Schedule AL screen [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     2h
 depends_on:   T86
 blocks:       T87
@@ -731,7 +731,7 @@ blocks:       T87
 
 ### T88 · XML generator v2 — multi-form support [parallel:no]
 ```
-status:       [status:open]
+status:       [status:completed]
 estimate:     3h
 depends_on:   T87
 blocks:       T89

@@ -19,7 +19,7 @@ const TABS: Tab[] = ['Salary', 'House Property', 'Capital Gains', 'Business', 'O
 
 export default function S04Review() {
   const navigate = useNavigate()
-  const { state } = useAppContext()
+  const { state, dispatch } = useAppContext()
 
   useEngine()
 
@@ -90,11 +90,11 @@ export default function S04Review() {
       </div>
 
       {/* Tabs */}
-      {activeTab === 'Salary'         && <SalaryTab s={s} overrides={overrides} />}
-      {activeTab === 'House Property' && <HousePropertyTab sv2={sv2} regime={selectedRegime} />}
+      {activeTab === 'Salary'         && <SalaryTab s={s} sv2={sv2} overrides={overrides} />}
+      {activeTab === 'House Property' && <HousePropertyTab sv2={sv2} regime={selectedRegime} dispatch={dispatch} />}
       {activeTab === 'Capital Gains'  && <CapitalGainsTab s={s} overrides={overrides} />}
-      {activeTab === 'Business'       && <BusinessTab s={s} broker={parsed.broker} overrides={overrides} />}
-      {activeTab === 'Other Sources'  && <OtherSourcesTab s={s} overrides={overrides} regime={selectedRegime} />}
+      {activeTab === 'Business'       && <BusinessTab s={s} sv2={sv2} broker={parsed.broker} overrides={overrides} />}
+      {activeTab === 'Other Sources'  && <OtherSourcesTab s={s} sv2={sv2} overrides={overrides} regime={selectedRegime} />}
 
       {/* Footer */}
       <div className="mt-6 pt-4 border-t border-ink-100 flex items-center justify-between">
@@ -117,9 +117,34 @@ export default function S04Review() {
 
 // ─── Salary Tab ───────────────────────────────────────────────────────────────
 
-function SalaryTab({ s, overrides }: { s: any; overrides: Record<string, number> }) {
+function SalaryTab({ s, sv2, overrides }: { s: any; sv2: any; overrides: Record<string, number> }) {
   if (!s?.S) return <EmptyTab msg="No Form 16 parsed yet." />
   const S = s.S
+  // Multi-employer from sv2 if available
+  const employers = sv2?.S?.employers ?? []
+
+  if (employers.length > 1) {
+    return (
+      <div className="space-y-3">
+        {employers.map((emp: any, i: number) => (
+          <ScheduleSection key={emp.id ?? i} title={`Employer ${i + 1} — ${emp.employerName || 'Unknown'}`} source={`Form 16 #${i + 1}`}>
+            <SummaryRow label="Gross salary" value={emp.grossSalary} />
+            <SummaryRow label="Standard deduction" value={-emp.standardDeduction} muted />
+            <SummaryRow label="Professional tax" value={-emp.professionalTax} muted />
+            <div className="border-t border-ink-100 mt-1 pt-1">
+              <SummaryRow label="Net taxable salary" value={emp.netTaxableSalary} bold />
+              <SummaryRow label="TDS deducted" value={emp.tdsDeducted} muted />
+            </div>
+          </ScheduleSection>
+        ))}
+        <div className="card bg-ink-50">
+          <SummaryRow label="Total net taxable salary" value={sv2.S.totalNetTaxable} bold />
+          <SummaryRow label="Total TDS deducted" value={sv2.S.totalTDS} muted />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <ScheduleSection title="Schedule S — Salary Income" source="Form 16">
       <EditableField
@@ -132,7 +157,7 @@ function SalaryTab({ s, overrides }: { s: any; overrides: Record<string, number>
       <EditableField
         label="Professional tax"
         fieldPath="S.professionalTax"
-        value={-(overrides['S.professionalTax'] ?? S.professionalTax)}
+        value={overrides['S.professionalTax'] ?? S.professionalTax}
         isOverridden={'S.professionalTax' in overrides}
       />
       <div className="border-t border-ink-100 mt-2 pt-2">
@@ -145,11 +170,65 @@ function SalaryTab({ s, overrides }: { s: any; overrides: Record<string, number>
 
 // ─── House Property Tab ───────────────────────────────────────────────────────
 
-function HousePropertyTab({ sv2, regime }: { sv2: any; regime: string }) {
-  if (!sv2?.HP?.properties?.length) {
-    return <EmptyTab msg="No house property added. Property income can be entered manually in a future update." />
+function HousePropertyTab({ sv2, regime, dispatch }: { sv2: any; regime: string; dispatch: any }) {
+  const [showAdd, setShowAdd] = useState(false)
+  const [propType, setPropType] = useState<'self_occupied' | 'let_out'>('let_out')
+  const [address, setAddress] = useState('')
+  const [rent, setRent] = useState(0)
+  const [municipalTax, setMunicipalTax] = useState(0)
+  const [interest, setInterest] = useState(0)
+
+  const hp = sv2?.HP
+
+  async function addProperty() {
+    const newProp = {
+      id: `hp-${Date.now()}`,
+      propertyType: propType,
+      address,
+      coOwnerShare: 100,
+      annualRentReceived: propType === 'self_occupied' ? 0 : rent,
+      municipalTaxPaid: propType === 'self_occupied' ? 0 : municipalTax,
+      netAnnualValue: 0,
+      standardDeduction30pct: 0,
+      interestOnLoan: interest,
+      incomeFromHP: 0,
+    }
+    const properties = [...(hp?.properties ?? []), newProp]
+    const { computeScheduleHP } = await import('../engine/scheduleHP')
+    const computedHP = computeScheduleHP(properties, regime as 'new' | 'old', {})
+    const nextSV2 = { ...(sv2 ?? {}), HP: computedHP }
+    dispatch({ type: 'SET_SCHEDULES_V2', schedules: nextSV2 })
+    setShowAdd(false); setAddress(''); setRent(0); setMunicipalTax(0); setInterest(0)
   }
-  const hp = sv2.HP
+
+  async function removeProperty(id: string) {
+    const properties = (hp?.properties ?? []).filter((p: any) => p.id !== id)
+    const { computeScheduleHP } = await import('../engine/scheduleHP')
+    const computedHP = computeScheduleHP(properties, regime as 'new' | 'old', {})
+    const nextSV2 = { ...(sv2 ?? {}), HP: computedHP }
+    dispatch({ type: 'SET_SCHEDULES_V2', schedules: nextSV2 })
+  }
+
+  if (!hp?.properties?.length) {
+    return (
+      <div className="space-y-3">
+        <EmptyTab msg="No house property added." />
+        {showAdd ? (
+          <AddPropertyForm
+            propType={propType} setPropType={setPropType}
+            address={address} setAddress={setAddress}
+            rent={rent} setRent={setRent}
+            municipalTax={municipalTax} setMunicipalTax={setMunicipalTax}
+            interest={interest} setInterest={setInterest}
+            onSave={addProperty} onCancel={() => setShowAdd(false)}
+          />
+        ) : (
+          <button onClick={() => setShowAdd(true)} className="btn-secondary w-full">+ Add property</button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-3">
       {hp.properties.map((p: any) => (
@@ -168,8 +247,22 @@ function HousePropertyTab({ sv2, regime }: { sv2: any; regime: string }) {
           <div className="border-t border-ink-100 mt-2 pt-2">
             <SummaryRow label="Income from HP" value={p.incomeFromHP} bold positive={p.incomeFromHP >= 0} />
           </div>
+          <button onClick={() => removeProperty(p.id)} className="text-xs text-rose-500 hover:underline mt-2">Remove</button>
         </ScheduleSection>
       ))}
+
+      {showAdd ? (
+        <AddPropertyForm
+          propType={propType} setPropType={setPropType}
+          address={address} setAddress={setAddress}
+          rent={rent} setRent={setRent}
+          municipalTax={municipalTax} setMunicipalTax={setMunicipalTax}
+          interest={interest} setInterest={setInterest}
+          onSave={addProperty} onCancel={() => setShowAdd(false)}
+        />
+      ) : (
+        <button onClick={() => setShowAdd(true)} className="text-xs text-brand-600 hover:underline">+ Add another property</button>
+      )}
       {hp.totalIncomeFromHP < 0 && (
         <WarningBanner
           severity="info"
@@ -242,7 +335,7 @@ function CapitalGainsTab({ s, overrides }: { s: any; overrides: Record<string, n
 
 // ─── Business Tab ─────────────────────────────────────────────────────────────
 
-function BusinessTab({ s, broker, overrides }: { s: any; broker: any; overrides: Record<string, number> }) {
+function BusinessTab({ s, sv2, broker, overrides }: { s: any; sv2: any; broker: any; overrides: Record<string, number> }) {
   const bp = s?.BP
   const hasFnO = broker?.hasFnO ?? false
   if (!bp && !hasFnO) return <EmptyTab msg="No business income data." />
@@ -278,26 +371,57 @@ function BusinessTab({ s, broker, overrides }: { s: any; broker: any; overrides:
           </div>
         </ScheduleSection>
       )}
+
+      {/* Presumptive income (44AD / 44ADA) */}
+      {sv2?.BP?.presumptiveEntries?.map((entry: any, i: number) => (
+        <ScheduleSection key={i} title={`${entry.type === 'presumptive_44ADA' ? 'Sec 44ADA — Profession' : 'Sec 44AD — Business'}`} source="Manual entry">
+          <SummaryRow label="Gross receipts" value={entry.grossReceipts} />
+          <SummaryRow label={`Presumptive rate (${entry.type === 'presumptive_44ADA' ? '50%' : entry.isDigital ? '6%' : '8%'})`} value={0} muted />
+          <div className="border-t border-ink-100 mt-1 pt-1">
+            <SummaryRow label="Presumptive income" value={entry.presumptiveIncome} bold />
+          </div>
+        </ScheduleSection>
+      ))}
     </div>
   )
 }
 
 // ─── Other Sources Tab ────────────────────────────────────────────────────────
 
-function OtherSourcesTab({ s, overrides, regime }: { s: any; overrides: Record<string, number>; regime: string }) {
+function OtherSourcesTab({ s, sv2, overrides, regime }: { s: any; sv2: any; overrides: Record<string, number>; regime: string }) {
   if (!s?.OS) return <EmptyTab msg="No other income data." />
   const os = s.OS
+  // v2 breakdown if available
+  const bd = sv2?.OS?.breakdown
 
   return (
     <ScheduleSection title="Schedule OS — Other Sources">
       <EditableField label="Dividend income" fieldPath="OS.dividendIncome"
         value={overrides['OS.dividendIncome'] ?? os.dividendIncome}
         isOverridden={'OS.dividendIncome' in overrides} />
-      <EditableField label="Interest income" fieldPath="OS.interestIncome"
-        value={overrides['OS.interestIncome'] ?? os.interestIncome}
-        isOverridden={'OS.interestIncome' in overrides} />
+      <EditableField label="Savings interest" fieldPath="OS.savingsInterest"
+        value={overrides['OS.savingsInterest'] ?? (bd?.savingsInterest ?? 0)}
+        isOverridden={'OS.savingsInterest' in overrides} />
+      <EditableField label="FD interest" fieldPath="OS.fdInterest"
+        value={overrides['OS.fdInterest'] ?? (bd?.fdInterest ?? 0)}
+        isOverridden={'OS.fdInterest' in overrides} />
+      <EditableField label="RD interest" fieldPath="OS.rdInterest"
+        value={overrides['OS.rdInterest'] ?? (bd?.rdInterest ?? 0)}
+        isOverridden={'OS.rdInterest' in overrides} />
+      <EditableField label="Family pension" fieldPath="OS.familyPension"
+        value={overrides['OS.familyPension'] ?? (bd?.familyPension ?? 0)}
+        isOverridden={'OS.familyPension' in overrides} />
+      {(bd?.familyPension ?? 0) > 0 && (
+        <p className="text-xs text-ink-400 ml-2">Standard deduction: lower of 1/3 or ₹15,000</p>
+      )}
+      <EditableField label="Lottery / casual income (flat 30%)" fieldPath="OS.lotteryWinnings"
+        value={overrides['OS.lotteryWinnings'] ?? (bd?.lotteryWinnings ?? 0)}
+        isOverridden={'OS.lotteryWinnings' in overrides} />
+      <EditableField label="Gifts received (taxable above ₹50,000)" fieldPath="OS.giftReceived"
+        value={overrides['OS.giftReceived'] ?? (bd?.giftReceived ?? 0)}
+        isOverridden={'OS.giftReceived' in overrides} />
       {regime === 'old' && (
-        <p className="text-xs text-ink-400 mt-1">Savings interest up to ₹10,000 eligible for 80TTA deduction on the Deductions screen.</p>
+        <p className="text-xs text-ink-400 mt-1">Savings interest eligible for 80TTA (₹10,000 cap) on the Deductions screen.</p>
       )}
       <div className="border-t border-ink-100 mt-2 pt-2">
         <SummaryRow label="Total other sources" value={os.total} bold />
@@ -307,6 +431,47 @@ function OtherSourcesTab({ s, overrides, regime }: { s: any; overrides: Record<s
 }
 
 // ─── Empty tab card ───────────────────────────────────────────────────────────
+
+// ─── Add Property Form ────────────────────────────────────────────────────────
+
+function AddPropertyForm({ propType, setPropType, address, setAddress, rent, setRent, municipalTax, setMunicipalTax, interest, setInterest, onSave, onCancel }: any) {
+  return (
+    <div className="card border-brand-200 space-y-3">
+      <p className="text-sm font-semibold text-ink-900">Add property</p>
+      <select value={propType} onChange={e => setPropType(e.target.value)}
+        className="w-full border border-ink-200 rounded-lg px-3 py-1.5 text-sm">
+        <option value="let_out">Let-out</option>
+        <option value="self_occupied">Self-occupied</option>
+        <option value="deemed_let_out">Deemed let-out</option>
+      </select>
+      <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Address"
+        className="w-full border border-ink-200 rounded-lg px-3 py-1.5 text-sm" />
+      {propType !== 'self_occupied' && (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ink-400 w-28 shrink-0">Annual rent ₹</span>
+            <input type="number" min={0} value={rent || ''} onChange={e => setRent(parseFloat(e.target.value) || 0)}
+              className="flex-1 border border-ink-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-ink-400 w-28 shrink-0">Municipal tax ₹</span>
+            <input type="number" min={0} value={municipalTax || ''} onChange={e => setMunicipalTax(parseFloat(e.target.value) || 0)}
+              className="flex-1 border border-ink-200 rounded-lg px-3 py-1.5 text-sm" />
+          </div>
+        </>
+      )}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-ink-400 w-28 shrink-0">Interest on loan ₹</span>
+        <input type="number" min={0} value={interest || ''} onChange={e => setInterest(parseFloat(e.target.value) || 0)}
+          className="flex-1 border border-ink-200 rounded-lg px-3 py-1.5 text-sm" />
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onSave} disabled={!address} className="btn-primary text-sm disabled:opacity-50">Save property</button>
+        <button onClick={onCancel} className="btn-secondary text-sm">Cancel</button>
+      </div>
+    </div>
+  )
+}
 
 function EmptyTab({ msg }: { msg: string }) {
   return (

@@ -21,10 +21,10 @@ export default function S08Settings() {
   const storageBytes = getStorageSize()
   const availableAYs = getAvailableAYs()
   const defaultAY = getDefaultAY()
-  const selectedAY = (state as any).selectedAY ?? defaultAY
+  const selectedAY = state.selectedAY ?? defaultAY
 
   function handleAYChange(ay: string) {
-    dispatch({ type: 'SET_SELECTED_AY', ay } as any)
+    dispatch({ type: 'SET_SELECTED_AY', ay })
   }
 
   // Load current rules for display
@@ -154,6 +154,38 @@ export default function S08Settings() {
             )}
           </div>
         )}
+      </div>
+
+      {/* ITR Form Override */}
+      <div className="card mb-4">
+        <h2 className="font-display font-semibold text-ink-700 text-sm mb-3 uppercase tracking-wider">
+          ITR Form
+        </h2>
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="text-ink-500">Auto-detected</span>
+          <span className="font-mono font-medium text-ink-800">{state.detectedITRForm ?? '—'}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-ink-600 shrink-0">Filing as</label>
+          <select
+            value={state.selectedITRForm}
+            onChange={e => dispatch({ type: 'SET_SELECTED_ITR_FORM', form: e.target.value as any })}
+            className="input-field flex-1"
+          >
+            {(['ITR1', 'ITR2', 'ITR3', 'ITR4'] as const).map(f => (
+              <option key={f} value={f}>{f}{f === state.detectedITRForm ? ' (auto-detected)' : ''}</option>
+            ))}
+          </select>
+        </div>
+        {state.detectedITRForm && state.selectedITRForm !== state.detectedITRForm && (
+          <div className="mt-3">
+            <WarningBanner
+              severity="warn"
+              message={`You have overridden the auto-detected form (${state.detectedITRForm}). Make sure ${state.selectedITRForm} is correct for your income profile before filing.`}
+            />
+          </div>
+        )}
+        <p className="text-xs text-ink-400 mt-2">Advanced — use with care. Most filers should use the auto-detected form.</p>
       </div>
 
       {/* AI usage */}

@@ -306,6 +306,7 @@ export type AppAction =
   | { type: 'SET_PARSED_FORM26AS'; data: Form26ASData }
   | { type: 'SET_PARSED_AIS'; data: AISData }
   | { type: 'SET_PRIOR_ITR_CFL'; entries: CFLEntry[] }
+  | { type: 'SET_SELECTED_AY'; ay: string }
   | { type: 'SET_SELECTED_REGIME'; regime: 'new' | 'old' }
   | { type: 'SET_SELECTED_ITR_FORM'; form: ITRForm }
   | { type: 'SET_DETECTED_ITR_FORM'; form: ITRForm }

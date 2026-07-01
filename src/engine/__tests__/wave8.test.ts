@@ -186,7 +186,7 @@ function makeEmptyMF(): MFData {
 function buildAppState(form16: Form16Data, broker: BrokerData, mf: MFData, overrides: Record<string, number> = {}): AppState {
   const schedules = computeSchedules(broker, form16, mf, overrides)
   const tax = computeTax(schedules, form16.tdsDeducted, 0)
-  const parsed = { broker, form16, mfStatement: mf, detectedBroker: broker.broker as 'zerodha' }
+  const parsed = { broker, form16, mfStatement: mf, detectedBroker: broker.broker as 'zerodha', form16List: [], form26AS: null, aisData: null, priorITRCFL: [] }
   const parseStatus = { brokerPL: 'done' as const, form16: 'done' as const, mfStatement: 'done' as const, errors: {} }
   const warnings = computeWarnings({ parsed, parseStatus, aiCallLog: [] }, schedules, tax)
   return {
@@ -196,8 +196,22 @@ function buildAppState(form16: Form16Data, broker: BrokerData, mf: MFData, overr
     uploadedFilesMeta: { brokerPL: null, form16: null, mfStatement: null },
     parsed,
     schedules,
+    schedules_v2: null,
     tax,
     overrides,
+    selectedAY: '2026-27',
+    selectedRegime: 'new' as const,
+    selectedITRForm: 'ITR3' as const,
+    detectedITRForm: null,
+    filerProfile: { dateOfBirth: null, filerCategory: 'general' as const },
+    deductions: null,
+    taxCredits: null,
+    regimeComparison: null,
+    aisMismatches: [],
+    aisMismatchResolutions: {},
+    bankAccounts: [],
+    scheduleAL: null,
+    parseStatus_v2: { form26AS: 'idle' as const, ais: 'idle' as const, previousITR: 'idle' as const, errors: {} },
     warnings,
     aiCallLog: [],
     parseStatus,
@@ -278,7 +292,7 @@ describe('T52 — Warning conditions', () => {
     const m = mf ?? makeEmptyMF()
     const schedules = computeSchedules(b, f, m, {})
     const tax = computeTax(schedules, f.tdsDeducted, 0)
-    const parsed = { broker: b, form16: f, mfStatement: m, detectedBroker: b.broker as 'zerodha' }
+    const parsed = { broker: b, form16: f, mfStatement: m, detectedBroker: b.broker as 'zerodha', form16List: [], form26AS: null, aisData: null, priorITRCFL: [] }
     const parseStatus = { brokerPL: 'done' as const, form16: 'done' as const, mfStatement: 'done' as const, errors: {} }
     return computeWarnings({ parsed, parseStatus, aiCallLog: [] }, schedules, tax).map(w => w.id)
   }
@@ -326,7 +340,7 @@ describe('T52 — Warning conditions', () => {
 
   it('BROKER_NOT_RECOGNISED — when detectedBroker is unknown', () => {
     const unknownBroker: BrokerData = { ...makeEmptyBroker(), broker: 'unknown' }
-    const parsed = { broker: unknownBroker, form16: makeForm16(10_75_000, 0), mfStatement: makeEmptyMF(), detectedBroker: 'unknown' as const }
+    const parsed = { broker: unknownBroker, form16: makeForm16(10_75_000, 0), mfStatement: makeEmptyMF(), detectedBroker: 'unknown' as const, form16List: [], form26AS: null, aisData: null, priorITRCFL: [] }
     const schedules = computeSchedules(unknownBroker, makeForm16(10_75_000, 0), makeEmptyMF(), {})
     const tax = computeTax(schedules, 0, 0)
     const parseStatus = { brokerPL: 'done' as const, form16: 'done' as const, mfStatement: 'done' as const, errors: {} }
@@ -340,7 +354,7 @@ describe('T52 — Warning conditions', () => {
     const m = makeEmptyMF()
     const schedules = computeSchedules(b, f, m, {})
     const tax = computeTax(schedules, 0, 0)
-    const parsed = { broker: b, form16: f, mfStatement: m, detectedBroker: b.broker as 'zerodha' }
+    const parsed = { broker: b, form16: f, mfStatement: m, detectedBroker: b.broker as 'zerodha', form16List: [], form26AS: null, aisData: null, priorITRCFL: [] }
     const parseStatus = { brokerPL: 'done' as const, form16: 'done' as const, mfStatement: 'done' as const, errors: {} }
     const fakeLog = [{ callId: '1', timestamp: '', callType: 'broker_detection' as const, triggerReason: '', payloadSummary: '', responseSummary: '', wasUseful: null, ruleGap: '' }]
     const ids = computeWarnings({ parsed, parseStatus, aiCallLog: fakeLog }, schedules, tax).map(w => w.id)
@@ -359,7 +373,7 @@ describe('T52 — Warning conditions', () => {
   it('F&O warning does NOT block user (is warn not error)', () => {
     const broker = { ...makeEmptyBroker(), hasFnO: true }
     const warnings = computeWarnings(
-      { parsed: { broker, form16: makeForm16(10_75_000, 0), mfStatement: makeEmptyMF(), detectedBroker: 'zerodha' as const },
+      { parsed: { broker, form16: makeForm16(10_75_000, 0), mfStatement: makeEmptyMF(), detectedBroker: 'zerodha' as const, form16List: [], form26AS: null, aisData: null, priorITRCFL: [] },
         parseStatus: { brokerPL: 'done' as const, form16: 'done' as const, mfStatement: 'done' as const, errors: {} },
         aiCallLog: [] },
       computeSchedules(broker, makeForm16(10_75_000, 0), makeEmptyMF(), {}),
@@ -376,7 +390,7 @@ describe('T52 — Warning conditions', () => {
     const m = makeEmptyMF()
     const schedules = computeSchedules(b, f, m, {})
     const tax = computeTax(schedules, 0, 0)
-    const parsed = { broker: b, form16: f, mfStatement: m, detectedBroker: b.broker as 'zerodha' }
+    const parsed = { broker: b, form16: f, mfStatement: m, detectedBroker: b.broker as 'zerodha', form16List: [], form26AS: null, aisData: null, priorITRCFL: [] }
     const parseStatus = { brokerPL: 'done' as const, form16: 'done' as const, mfStatement: 'done' as const, errors: {} }
     const warnings = computeWarnings({ parsed, parseStatus, aiCallLog: [] }, schedules, tax)
     const cfl = warnings.find(w => w.id === 'CARRY_FORWARD_DEADLINE')

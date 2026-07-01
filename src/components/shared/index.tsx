@@ -70,23 +70,34 @@ export function AppShell({ children }: AppShellProps) {
 
 // ─── StepProgress ─────────────────────────────────────────────────────────────
 
+// v2: 5-step flow
+// Step 0: Upload (/upload, /parsing)
+// Step 1: Income (/review)
+// Step 2: Deductions (/review/deductions, /review/regime, /review/ais)
+// Step 3: Review (/review/bank-accounts, /review/schedule-al)
+// Step 4: Export (/summary, /export)
 const STEPS = [
-  { label: 'Upload', route: '/upload' },
-  { label: 'Review', route: '/review' },
-  { label: 'Summary', route: '/summary' },
+  { label: 'Upload',      routes: ['/upload', '/parsing'] },
+  { label: 'Income',      routes: ['/review'] },
+  { label: 'Deductions',  routes: ['/review/deductions', '/review/regime', '/review/ais'] },
+  { label: 'Review',      routes: ['/review/bank-accounts', '/review/schedule-al'] },
+  { label: 'Export',      routes: ['/summary', '/export'] },
 ]
 
 export function StepProgress() {
   const location = useLocation()
 
-  const currentStepIndex = STEPS.findIndex(
-    s => location.pathname === s.route || location.pathname.startsWith(s.route + '/')
+  const currentStepIndex = STEPS.findIndex(s =>
+    s.routes.some(r =>
+      location.pathname === r ||
+      location.pathname.startsWith(r === '/review' ? '/review/' : r + '/')
+    )
   )
 
-  // Special case: parsing is between upload and review
+  // Parsing sits between Upload (0) and Income (1)
   const effectiveIndex = location.pathname === '/parsing'
     ? 0.5
-    : currentStepIndex
+    : currentStepIndex >= 0 ? currentStepIndex : 0
 
   return (
     <div className="flex items-center gap-0 mb-6">
@@ -95,7 +106,7 @@ export function StepProgress() {
         const isActive = Math.floor(effectiveIndex) === i || (effectiveIndex === 0.5 && i === 0)
 
         return (
-          <React.Fragment key={step.route}>
+          <React.Fragment key={step.routes[0]}>
             <div className="flex items-center gap-2">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
@@ -370,5 +381,83 @@ export function ThumbsDownIcon({ className = '' }: { className?: string }) {
       <path d="M11 9L9 14a1 1 0 01-1-1v-3H4a1 1 0 01-1-1l1-5h8v6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M11 9h2V3h-2v6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
+  )
+}
+
+// ─── ITRFormBadge ─────────────────────────────────────────────────────────────
+
+interface ITRFormBadgeProps {
+  form: string | null
+  detected?: string | null
+  onOverride?: () => void
+}
+
+export function ITRFormBadge({ form, detected, onOverride }: ITRFormBadgeProps) {
+  if (!form) return null
+  const isOverridden = detected && form !== detected
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700">
+        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+          <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.2"/>
+          <path d="M3 5h6M3 7.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        {form}
+      </span>
+      {isOverridden && (
+        <span className="text-xs text-amber-600 font-medium">(overridden from {detected})</span>
+      )}
+      {onOverride && (
+        <button onClick={onOverride} className="text-xs text-ink-400 hover:text-ink-700 underline">
+          change
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── RegimeBadge ──────────────────────────────────────────────────────────────
+
+interface RegimeBadgeProps {
+  regime: 'new' | 'old'
+  onSwitch?: () => void
+}
+
+export function RegimeBadge({ regime, onSwitch }: RegimeBadgeProps) {
+  const isNew = regime === 'new'
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${
+        isNew
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : 'bg-amber-50 border-amber-200 text-amber-700'
+      }`}>
+        {isNew ? '✦' : '⊕'} {isNew ? 'New Regime' : 'Old Regime'}
+      </span>
+      {onSwitch && (
+        <button onClick={onSwitch} className="text-xs text-ink-400 hover:text-ink-700 underline">
+          switch
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── ALThresholdBanner ────────────────────────────────────────────────────────
+
+interface ALThresholdBannerProps {
+  totalIncome: number
+}
+
+export function ALThresholdBanner({ totalIncome }: ALThresholdBannerProps) {
+  if (totalIncome <= 5_000_000) return null
+  return (
+    <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+      <span className="text-amber-500 mt-0.5 shrink-0">⚠</span>
+      <p>
+        <span className="font-semibold">Schedule AL is now required.</span>{' '}
+        Your total income exceeds ₹50L. Assets &amp; liabilities details must be filled before downloading XML.
+      </p>
+    </div>
   )
 }

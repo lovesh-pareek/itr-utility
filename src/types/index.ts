@@ -252,6 +252,11 @@ export interface AppState {
     form16: Form16Data | null
     mfStatement: MFData | null
     detectedBroker: BrokerName | null
+    // v2 additions
+    form16List: Form16Data[]
+    form26AS: Form26ASData | null
+    aisData: AISData | null
+    priorITRCFL: CFLEntry[]
   }
   schedules: Schedules | null
   tax: TaxComputation | null
@@ -259,7 +264,22 @@ export interface AppState {
   warnings: Warning[]
   aiCallLog: AICallEntry[]
   parseStatus: ParseStatus
+  parseStatus_v2: ParseStatus_v2
   lastReviewTab: string
+  // ── v2 additions ───────────────────────────────────────────────────────────
+  selectedAY: string                    // e.g. '2026-27'
+  selectedRegime: 'new' | 'old'
+  selectedITRForm: ITRForm
+  detectedITRForm: ITRForm | null
+  filerProfile: FilerProfile
+  deductions: DeductionsVI_A | null
+  taxCredits: TaxCredits | null
+  regimeComparison: RegimeComparison | null
+  aisMismatches: AISMismatch[]
+  aisMismatchResolutions: Record<string, 'use_ais' | 'keep_parsed'>
+  bankAccounts: BankAccount[]
+  scheduleAL: ScheduleAL | null
+  schedules_v2: Schedules_v2 | null
 }
 
 export type AppAction =
@@ -281,6 +301,25 @@ export type AppAction =
   | { type: 'CLEAR_SESSION' }
   | { type: 'SET_SAVED_AT'; timestamp: string }
   | { type: 'SET_LAST_REVIEW_TAB'; tab: string }
+  // ── v2 actions ─────────────────────────────────────────────────────────────
+  | { type: 'SET_PARSED_FORM16_LIST'; data: Form16Data[] }
+  | { type: 'SET_PARSED_FORM26AS'; data: Form26ASData }
+  | { type: 'SET_PARSED_AIS'; data: AISData }
+  | { type: 'SET_PRIOR_ITR_CFL'; entries: CFLEntry[] }
+  | { type: 'SET_SELECTED_REGIME'; regime: 'new' | 'old' }
+  | { type: 'SET_SELECTED_ITR_FORM'; form: ITRForm }
+  | { type: 'SET_DETECTED_ITR_FORM'; form: ITRForm }
+  | { type: 'SET_FILER_PROFILE'; profile: FilerProfile }
+  | { type: 'SET_DEDUCTIONS'; deductions: DeductionsVI_A }
+  | { type: 'SET_TAX_CREDITS'; credits: TaxCredits }
+  | { type: 'SET_REGIME_COMPARISON'; comparison: RegimeComparison }
+  | { type: 'SET_AIS_MISMATCHES'; mismatches: AISMismatch[] }
+  | { type: 'SET_AIS_MISMATCH_RESOLUTION'; field: string; resolution: 'use_ais' | 'keep_parsed' }
+  | { type: 'SET_BANK_ACCOUNTS'; accounts: BankAccount[] }
+  | { type: 'ADD_BANK_ACCOUNT'; account: BankAccount }
+  | { type: 'REMOVE_BANK_ACCOUNT'; id: string }
+  | { type: 'SET_SCHEDULE_AL'; scheduleAL: ScheduleAL | null }
+  | { type: 'SET_SCHEDULES_V2'; schedules: Schedules_v2 }
 
 export interface PersistedSession {
   sessionId: string
@@ -292,6 +331,18 @@ export interface PersistedSession {
   tax: TaxComputation | null
   overrides: Record<string, number>
   aiCallLog: AICallEntry[]
+  // v2 persisted slices
+  selectedAY?: string
+  selectedRegime?: 'new' | 'old'
+  selectedITRForm?: ITRForm
+  filerProfile?: FilerProfile
+  deductions?: DeductionsVI_A | null
+  taxCredits?: TaxCredits | null
+  regimeComparison?: RegimeComparison | null
+  aisMismatchResolutions?: Record<string, 'use_ais' | 'keep_parsed'>
+  bankAccounts?: BankAccount[]
+  scheduleAL?: ScheduleAL | null
+  schedules_v2?: Schedules_v2 | null
 }
 
 // ─── v2.0 Income Model Types ──────────────────────────────────────────────────

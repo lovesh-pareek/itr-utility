@@ -47,6 +47,18 @@ export function useSessionPersistence() {
         tax: state.tax,
         overrides: state.overrides,
         aiCallLog: state.aiCallLog,
+        // v2 slices
+        selectedAY: state.selectedAY,
+        selectedRegime: state.selectedRegime,
+        selectedITRForm: state.selectedITRForm,
+        filerProfile: state.filerProfile,
+        deductions: state.deductions,
+        taxCredits: state.taxCredits,
+        regimeComparison: state.regimeComparison,
+        aisMismatchResolutions: state.aisMismatchResolutions,
+        bankAccounts: state.bankAccounts,
+        scheduleAL: state.scheduleAL,
+        schedules_v2: state.schedules_v2,
       }
 
       localStorage.setItem(SESSION_KEY, JSON.stringify(toSave))

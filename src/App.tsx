@@ -14,6 +14,12 @@ import S06Export from './screens/S06Export'
 import S07AILog from './screens/S07AILog'
 import S08Settings from './screens/S08Settings'
 import Diagnostic from './screens/Diagnostic'
+// v2 screens (stubs — built in Wave 15)
+import { S05Deductions }       from './screens/S05Deductions'
+import { S06RegimeComparison } from './screens/S06RegimeComparison'
+import { S07AISValidation }    from './screens/S07AISValidation'
+import { S12BankAccounts }     from './screens/S12BankAccounts'
+import { S13ScheduleAL }       from './screens/S13ScheduleAL'
 
 function AppRoutes() {
   return (
@@ -25,6 +31,11 @@ function AppRoutes() {
         <Route path="/review" element={<S04Review />} />
         <Route path="/summary" element={<S05Summary />} />
         <Route path="/export" element={<S06Export />} />
+        <Route path="/review/deductions"    element={<S05Deductions />} />
+        <Route path="/review/regime"         element={<S06RegimeComparison />} />
+        <Route path="/review/ais"            element={<S07AISValidation />} />
+        <Route path="/review/bank-accounts"  element={<S12BankAccounts />} />
+        <Route path="/review/schedule-al"    element={<S13ScheduleAL />} />
         <Route path="/settings/ai-log" element={<S07AILog />} />
         <Route path="/settings" element={<S08Settings />} />
         {/* Catch-all */}

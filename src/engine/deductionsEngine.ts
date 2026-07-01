@@ -73,7 +73,7 @@ export function computeDeductionsVI_A(
 ): DeductionsVI_A {
   // ── New Regime: only 80CCD2 and 80CCH apply ──────────────────────────────
   if (regime === 'new') {
-    const rules = getRules(ay, 'new')
+    // const rules = getRules(ay, 'new')
     // 80CCD2 cap: 10% of gross salary (14% for central govt, but 10% is conservative default)
     const ccd2Cap = Math.round(raw.grossSalary * 0.10)
     const sec80CCD2 = Math.min(raw.sec80CCD2, ccd2Cap)

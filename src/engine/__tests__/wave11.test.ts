@@ -4,7 +4,7 @@ import { computeScheduleHP } from '../scheduleHP'
 import { computePropertyCG, getCII, computeIndexedCost } from '../schedulePropertyCG'
 import { computeScheduleBP_v2, getTotalPresumptiveIncome } from '../scheduleBP_v2'
 import { computeScheduleOS_v2, emptyOtherSourcesBreakdown } from '../scheduleOS_v2'
-import { detectITRForm, computeScheduleALRequired, computeTotalIncome_v2 } from '../incomeEngine_v2'
+import { detectITRForm, computeScheduleALRequired } from '../incomeEngine_v2'
 import type {
   EmployerEntry, HouseProperty, PropertySale, PresumptiveEntry,
   FnOEntry, ScheduleS_v2, ScheduleHP, ScheduleCG_v2, ScheduleBP_v2,

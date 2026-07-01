@@ -71,10 +71,11 @@ interface FileCardProps {
   status: 'pending' | 'valid' | 'error' | 'checking'
   broker?: BrokerName | null
   errorMsg?: string
+  badge?: string
   onRemove: () => void
 }
 
-export function FileCard({ file, status, broker, errorMsg, onRemove }: FileCardProps) {
+export function FileCard({ file, status, broker, errorMsg, badge, onRemove }: FileCardProps) {
   const sizeStr = file.size < 1024 * 1024
     ? `${(file.size / 1024).toFixed(1)} KB`
     : `${(file.size / (1024 * 1024)).toFixed(1)} MB`
@@ -116,6 +117,11 @@ export function FileCard({ file, status, broker, errorMsg, onRemove }: FileCardP
         )}
         {status === 'error' && errorMsg && (
           <p className="mt-1 text-xs text-rose-600">{errorMsg}</p>
+        )}
+        {status === 'valid' && badge && (
+          <span className="inline-flex items-center mt-1 text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-0.5 rounded-full">
+            {badge}
+          </span>
         )}
       </div>
 

@@ -32,8 +32,8 @@ export default function S06Export() {
     setXmlState('generating')
     setXmlErrors([])
     try {
-      const { generateITR3XML } = await import('../output/xmlGenerator')
-      const result = generateITR3XML(state)
+      const { generateXML_v2 } = await import('../output/xmlGenerator')
+      const result = generateXML_v2(state)
       if (!result.valid) {
         setXmlErrors(result.errors)
         setXmlState('error')
@@ -103,7 +103,7 @@ export default function S06Export() {
           <div className="flex items-center gap-3 mb-3">
             <span className="text-xl">📋</span>
             <div>
-              <p className="font-medium text-ink-900">ITR-3 XML — AY 2026-27</p>
+              <p className="font-medium text-ink-900">{state.selectedITRForm ?? 'ITR3'} XML — AY 2026-27 — AY 2026-27</p>
               <p className="text-xs text-ink-400">Upload this on incometax.gov.in to pre-fill your return</p>
             </div>
           </div>

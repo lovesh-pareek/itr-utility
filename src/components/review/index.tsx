@@ -154,12 +154,13 @@ interface SummaryRowProps {
   value: number
   bold?: boolean
   positive?: boolean
+  muted?: boolean
 }
 
-export function SummaryRow({ label, value, bold, positive }: SummaryRowProps) {
+export function SummaryRow({ label, value, bold, positive, muted }: SummaryRowProps) {
   return (
     <div className={`flex items-center justify-between py-2.5 border-t border-[var(--color-border)] ${bold ? 'bg-ink-50 -mx-4 px-4' : ''}`}>
-      <span className={`text-sm ${bold ? 'font-semibold text-ink-900' : 'text-ink-600'}`}>{label}</span>
+      <span className={`text-sm ${bold ? 'font-semibold text-ink-900' : muted ? 'text-ink-400' : 'text-ink-600'}`}>{label}</span>
       <span className={`font-mono text-sm font-semibold ${
         positive && value > 0 ? 'text-emerald-600' :
         value < 0 ? 'text-rose-600' : 'text-ink-900'

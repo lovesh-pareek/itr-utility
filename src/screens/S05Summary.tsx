@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { StepProgress, MetricCard, WarningBanner, ArrowRightIcon } from '../components/shared'
+import { StepProgress, MetricCard, WarningBanner, ArrowRightIcon, ITRFormBadge, RegimeBadge } from '../components/shared'
 import { TaxRow } from '../components/review'
 import { fmtINR } from '../components/review'
 import { useAppContext } from '../context/AppContext'
@@ -31,10 +31,12 @@ export default function S05Summary() {
   return (
     <div>
       <StepProgress />
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">Tax Summary</h1>
-        <p className="text-sm text-ink-400">Step 3 of 3 — Review before exporting</p>
+      <div className="mb-4 flex items-center gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold text-ink-900">Tax Summary</h1>
+        <ITRFormBadge form={state.selectedITRForm} detected={state.detectedITRForm} />
+        <RegimeBadge regime={state.selectedRegime} />
       </div>
+      <p className="text-xs text-ink-400 mb-4">Filing ITR-{state.selectedITRForm?.replace('ITR','') ?? '3'} · {state.selectedRegime === 'new' ? 'New Regime' : 'Old Regime'} · AY 2026-27</p>
 
       {/* Top metric cards */}
       <div className="grid grid-cols-3 gap-3 mb-6">
@@ -83,6 +85,29 @@ export default function S05Summary() {
           />
         </div>
       </div>
+
+      {/* Prior year losses used */}
+      {state.parsed.priorITRCFL.length > 0 && (
+        <div className="card mb-5 border-blue-200 bg-blue-50">
+          <h2 className="font-semibold text-blue-900 mb-2 text-sm">Prior year losses carry-forward</h2>
+          {state.parsed.priorITRCFL.map(e => (
+            <div key={e.id} className="flex justify-between text-xs text-blue-800 py-1">
+              <span>{e.lossType.toUpperCase()} from AY {e.ayOfOrigin}</span>
+              <span>{e.yearsRemaining} year{e.yearsRemaining !== 1 ? 's' : ''} remaining · {fmtINR(e.amount)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Schedule AL warning */}
+      {state.tax && state.tax.totalIncome > 5_000_000 && !state.scheduleAL && (
+        state.selectedITRForm !== 'ITR1' && state.selectedITRForm !== 'ITR4'
+      ) && (
+        <div className="mb-4 bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 text-sm text-amber-800">
+          <p className="font-semibold">Schedule AL required</p>
+          <p className="text-xs mt-1">XML download is blocked until Schedule AL is filled. <button onClick={() => navigate('/review/schedule-al')} className="underline">Fill Schedule AL →</button></p>
+        </div>
+      )}
 
       {/* Warnings */}
       {warnings.length > 0 && (

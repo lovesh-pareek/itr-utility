@@ -1,7 +1,7 @@
 import type {
   ScheduleS_v2, ScheduleHP, ScheduleCG_v2, ScheduleBP_v2, ScheduleOS_v2,
-  ScheduleCYLA, ScheduleCFL_v2, CFLEntry, ITRForm, Warning, WarningId,
-  WarningSeverity, Schedules_v2,
+  ScheduleCFL_v2, CFLEntry, ITRForm, Warning, WarningId,
+  WarningSeverity,
 } from '../types'
 import { getRules } from './taxRules'
 import { getTotalPresumptiveIncome, getNetNonSpeculativeIncome } from './scheduleBP_v2'
@@ -91,7 +91,7 @@ export function computeTotalIncome_v2(
     businessFnO +
     businessNonSpeculative +
     otherSourcesSlabRate +
-    (CG as any).debtMFGains ?? 0
+    (CG as any).debtMFGains || 0
 
   const totalIncome =
     totalSlabIncome +
@@ -129,12 +129,13 @@ export function computeTotalIncome_v2(
  * 5. Salary + ≤1 HP + OS only, total income ≤ ₹50L, no CG, no business → ITR-1
  * 6. Fallback → ITR-2
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function detectITRForm(
   S: ScheduleS_v2,
   HP: ScheduleHP,
   CG: ScheduleCG_v2,
   BP: ScheduleBP_v2,
-  OS: ScheduleOS_v2,
+  _OS: ScheduleOS_v2,
   totalIncome: number,
   ay = '2026-27'
 ): ITRForm {
@@ -148,7 +149,7 @@ export function detectITRForm(
   const hasAnyBusinessIncome = hasIntraday || hasFnO || hasNonSpeculative
   const hasCG = CG.totalSTCG > 0 || CG.totalLTCG > 0 || CG.propertySales.length > 0
   const hasMultipleHP = HP.properties.length > 1
-  const hasSingleHP = HP.properties.length === 1
+  // hasSingleHP reserved for future ITR-1 simplified flow
   const hasSalary = S.totalNetTaxable > 0
 
   // Rule 1: Any non-presumptive business → ITR-3

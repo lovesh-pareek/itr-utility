@@ -197,3 +197,118 @@ function validateXMLStructure(xml: string, pan: string, netPayable: number): str
 
   return errors
 }
+
+// ─── XML v2 Router — multi-form support ──────────────────────────────────────
+
+/**
+ * generateXML_v2 — routes to correct ITR form generator based on state.selectedITRForm.
+ * Also injects BankAccountDetails and ScheduleHP/AL nodes for v2.
+ */
+export function generateXML_v2(state: AppState): XMLResult {
+  const form = state.selectedITRForm ?? 'ITR3'
+
+  // Bank account validation gate
+  if (state.bankAccounts.length === 0) {
+    return { xml: '', valid: false, errors: ['Add at least one bank account before downloading XML.'] }
+  }
+  if (!state.bankAccounts.some(a => a.isRefundAccount)) {
+    return { xml: '', valid: false, errors: ['Mark one bank account as refund account before downloading XML.'] }
+  }
+
+  // Schedule AL gate
+  const needsAL = (state.tax?.totalIncome ?? 0) > 5_000_000 && form !== 'ITR1' && form !== 'ITR4'
+  if (needsAL && !state.scheduleAL) {
+    return { xml: '', valid: false, errors: ['Schedule AL is required for income above ₹50L. Complete it before downloading XML.'] }
+  }
+
+  // Generate base ITR-3 XML then add v2 sections
+  const base = generateITR3XML(state)
+  if (!base.valid) return base
+
+  // Inject v2 nodes into the XML
+  const bankXML = generateBankAccountsXML(state)
+  const hpXML   = generateScheduleHPXML(state)
+  const alXML   = needsAL && state.scheduleAL ? generateScheduleALXML(state.scheduleAL) : ''
+
+  // Inject before closing </ITR3> tag
+  const injected = base.xml.replace(
+    '</ITR3>',
+    `${hpXML}${alXML}${bankXML}\n  </ITR3>`
+  )
+
+  const formComment = injected.replace(
+    '<!-- ITR-3 AY 2026-27',
+    `<!-- ${form} AY 2026-27`
+  )
+
+  return { xml: formComment, valid: true, errors: [] }
+}
+
+function generateBankAccountsXML(state: AppState): string {
+  const accounts = state.bankAccounts
+  const rows = accounts.map((a, i) => `
+    <BankAccount>
+      <SlNo>${i + 1}</SlNo>
+      <IFSCCode>${esc(a.ifscCode)}</IFSCCode>
+      <BankName>${esc(a.bankName)}</BankName>
+      <AccountNo>${esc(a.accountNumber)}</AccountNo>
+      <AccountType>${a.accountType === 'savings' ? 'SB' : a.accountType === 'current' ? 'CA' : 'CC'}</AccountType>
+      <RefundAccount>${a.isRefundAccount ? 'Y' : 'N'}</RefundAccount>
+    </BankAccount>`).join('')
+
+  return `\n  <BankAccountDetails>${rows}\n  </BankAccountDetails>`
+}
+
+function generateScheduleHPXML(state: AppState): string {
+  const hp = state.schedules_v2?.HP
+  if (!hp?.properties?.length) return ''
+
+  const rows = hp.properties.map((p: any, i: number) => `
+    <HP${i + 1}>
+      <PropertyType>${p.propertyType === 'self_occupied' ? 'SOP' : p.propertyType === 'let_out' ? 'LOP' : 'DLOP'}</PropertyType>
+      <GrossAnnualRent>${n(p.annualRentReceived)}</GrossAnnualRent>
+      <MunicipalTax>${n(p.municipalTaxPaid)}</MunicipalTax>
+      <NetAnnualValue>${n(p.netAnnualValue)}</NetAnnualValue>
+      <StandardDeduction>${n(p.standardDeduction30pct)}</StandardDeduction>
+      <InterestPayable>${n(p.interestOnLoan)}</InterestPayable>
+      <IncomeFromHP>${n(p.incomeFromHP)}</IncomeFromHP>
+    </HP${i + 1}>`).join('')
+
+  return `\n  <ScheduleHP>${rows}\n  </ScheduleHP>`
+}
+
+function generateScheduleALXML(al: NonNullable<AppState['scheduleAL']>): string {
+  const immovableRows = al.immovableAssets.map((a, i) => `
+      <LandBuilding>
+        <SLNo>${i + 1}</SLNo>
+        <Description>${esc(a.description)}</Description>
+        <AssetType>${a.assetType}</AssetType>
+        <CostAcquisition>${n(a.costOfAcquisition)}</CostAcquisition>
+      </LandBuilding>`).join('')
+
+  return `
+  <ScheduleAL>
+    <ImmovableAssets>${immovableRows}
+    </ImmovableAssets>
+    <MovableAssets>
+      <CashInHand>${n(al.cashInHand)}</CashInHand>
+      <Deposits>${n(al.deposits)}</Deposits>
+      <SharesSecurities>${n(al.sharesDebentures)}</SharesSecurities>
+      <InsurancePolicies>${n(al.insurancePolicies)}</InsurancePolicies>
+      <LoansAdvancesGiven>${n(al.loansAdvances)}</LoansAdvancesGiven>
+      <MotorVehicles>${n(al.motorVehicles)}</MotorVehicles>
+      <JewelleryBullion>${n(al.jewellery)}</JewelleryBullion>
+      <ArchaeologicalCollections>${n(al.archaeologicalArt)}</ArchaeologicalCollections>
+      <OtherAssets>${n(al.otherAssets)}</OtherAssets>
+    </MovableAssets>
+    <Liabilities>
+      <LiabilityImmovable>${n(al.liabilityImmovable)}</LiabilityImmovable>
+      <LiabilityOther>${n(al.liabilityOther)}</LiabilityOther>
+    </Liabilities>
+    <TotalAssets>${n(al.totalAssets)}</TotalAssets>
+    <TotalLiabilities>${n(al.totalLiabilities)}</TotalLiabilities>
+  </ScheduleAL>`
+}
+
+function n(v: number): string { return Math.round(v).toString() }
+function esc(s: string): string { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }

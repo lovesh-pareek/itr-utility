@@ -1,324 +1,317 @@
-import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { StepProgress, WarningBanner, ArrowRightIcon } from '../components/shared'
-import { EditableField, ScheduleSection, SummaryRow } from '../components/review'
-import { fmtINR } from '../components/review'
-import { useAppContext } from '../context/AppContext'
-import { useAppDispatch } from '../context/AppContext'
-import { useEngine } from '../hooks/useEngine'
-import { getWarning } from '../engine/warnings'
+/**
+ * S04 Income Hub v2 — 5-tab income review
+ * Uses v1 schedule types (ScheduleS, ScheduleCG, ScheduleBP, ScheduleOS)
+ * with correct field names. v2 HP data from schedules_v2.
+ */
 
-const TABS = ['Schedule S', 'Schedule BP', 'Schedule CG', 'Schedule OS', 'CYLA', 'CFL'] as const
-type Tab = typeof TABS[number]
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  StepProgress, WarningBanner, ArrowRightIcon,
+  ITRFormBadge, RegimeBadge, ALThresholdBanner,
+} from '../components/shared'
+import { EditableField, ScheduleSection, SummaryRow, fmtINR } from '../components/review'
+import { useAppContext } from '../context/AppContext'
+import { useEngine } from '../hooks/useEngine'
+
+type Tab = 'Salary' | 'House Property' | 'Capital Gains' | 'Business' | 'Other Sources'
+const TABS: Tab[] = ['Salary', 'House Property', 'Capital Gains', 'Business', 'Other Sources']
 
 export default function S04Review() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const { state, dispatch } = useAppContext()
-  const { schedules, warnings, tax } = state
+  const { state } = useAppContext()
 
-  useEngine() // reactive recomputation on any change
+  useEngine()
 
-  const initialTab: Tab = (location.state as { tab?: Tab })?.tab ?? 'Schedule S'
-  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
+  const [activeTab, setActiveTab] = useState<Tab>('Salary')
 
-  function handleTabChange(tab: Tab) {
-    setActiveTab(tab)
-    dispatch({ type: 'SET_LAST_REVIEW_TAB', tab })
-  }
+  const { schedules: s, schedules_v2: sv2, warnings, tax,
+          selectedITRForm, detectedITRForm, selectedRegime, overrides, parsed } = state
 
-  const overrides = state.overrides
-
-  const hasData = !!(state.parsed.broker || state.parsed.form16 || state.parsed.mfStatement)
-
+  const hasData = !!(parsed.broker || parsed.form16)
   if (!hasData) {
     return (
       <div>
         <StepProgress />
         <div className="card text-center py-16">
           <p className="text-ink-500 mb-3">No data loaded yet.</p>
-          <button onClick={() => navigate('/upload')} className="btn-primary">
-            ← Upload documents
-          </button>
+          <button onClick={() => navigate('/upload')} className="btn-primary">← Upload documents</button>
         </div>
       </div>
     )
   }
 
+  // Tab active state — greyed if no data for that head
+  const tabActive: Record<Tab, boolean> = {
+    'Salary':         !!s?.S,
+    'House Property': !!(sv2?.HP?.properties?.length),
+    'Capital Gains':  !!(s?.CG && (s.CG.equitySTCG || s.CG.equityLTCG || s.CG.mfEquitySTCG || s.CG.mfEquityLTCG)),
+    'Business':       !!(s?.BP && s.BP.netSpeculativePnL !== 0) || !!(parsed.broker?.hasFnO),
+    'Other Sources':  !!(s?.OS && (s.OS.dividendIncome || s.OS.interestIncome)),
+  }
+
+  const totalIncome = tax?.totalIncome ?? 0
+
   return (
     <div>
       <StepProgress />
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-ink-900 mb-1">Review your data</h1>
-        <p className="text-sm text-ink-400">Step 2 of 3 — All values are editable · Tax updates live</p>
+
+      <div className="mb-4 flex items-center gap-3 flex-wrap">
+        <h1 className="text-xl font-bold text-ink-900">Review your income</h1>
+        <ITRFormBadge form={selectedITRForm} detected={detectedITRForm} />
+        <RegimeBadge regime={selectedRegime} onSwitch={() => navigate('/review/regime')} />
       </div>
 
-      {/* AIS warning — always shown */}
-      <WarningBanner
-        severity="warn"
-        message="Cross-check all values against your AIS on incometax.gov.in before uploading."
-      />
+      <ALThresholdBanner totalIncome={totalIncome} />
 
-      {/* Inline warnings from other conditions */}
-      {warnings.filter(w => ['FNO_DETECTED','AI_CALL_MADE','BROKER_NOT_RECOGNISED'].includes(w.id)).map(w => (
-        <div key={w.id} className="mt-2">
-          <WarningBanner severity={w.severity} message={w.message} />
-        </div>
-      ))}
-
-      {/* Live tax summary bar */}
-      {tax && (
-        <div className="mt-4 bg-ink-900 text-white rounded-xl px-4 py-3 flex flex-wrap gap-4 text-sm">
-          <div>
-            <p className="text-ink-400 text-xs">Total income</p>
-            <p className="font-mono font-semibold">{fmtINR(tax.totalIncome)}</p>
-          </div>
-          <div>
-            <p className="text-ink-400 text-xs">Total tax</p>
-            <p className="font-mono font-semibold">{fmtINR(tax.totalTaxPayable)}</p>
-          </div>
-          <div>
-            <p className="text-ink-400 text-xs">Net {tax.netPayable >= 0 ? 'payable' : 'refund'}</p>
-            <p className={`font-mono font-semibold ${tax.netPayable < 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {fmtINR(Math.abs(tax.netPayable))}
-            </p>
-          </div>
-          <p className="text-ink-500 text-xs self-end ml-auto">Updates live as you edit ↓</p>
+      {warnings.some(w => w.id === 'AIS_MISMATCH_RISK') && (
+        <div className="mb-3">
+          <WarningBanner severity="warn" message="Cross-check all values against your AIS on incometax.gov.in before uploading XML." />
         </div>
       )}
 
-      {/* Schedule tabs */}
-      <div className="mt-5 flex gap-2 mb-5 overflow-x-auto pb-1 scrollbar-none">
+      {/* 5-tab navigation */}
+      <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
         {TABS.map(tab => (
           <button
             key={tab}
-            onClick={() => handleTabChange(tab)}
-            className={`schedule-tab shrink-0 ${activeTab === tab ? 'schedule-tab-active' : 'schedule-tab-inactive'}`}
+            onClick={() => tabActive[tab] && setActiveTab(tab)}
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium whitespace-nowrap transition-colors ${
+              activeTab === tab
+                ? 'bg-ink-900 text-white'
+                : tabActive[tab]
+                ? 'bg-ink-100 text-ink-700 hover:bg-ink-200'
+                : 'bg-ink-50 text-ink-300 cursor-not-allowed'
+            }`}
           >
             {tab}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'Schedule S' && <ScheduleSTab schedules={schedules} overrides={overrides} state={state} />}
-      {activeTab === 'Schedule BP' && <ScheduleBPTab schedules={schedules} overrides={overrides} warnings={warnings} />}
-      {activeTab === 'Schedule CG' && <ScheduleCGTab schedules={schedules} overrides={overrides} warnings={warnings} />}
-      {activeTab === 'Schedule OS' && <ScheduleOSTab schedules={schedules} overrides={overrides} />}
-      {activeTab === 'CYLA' && <ScheduleCYLATab schedules={schedules} />}
-      {activeTab === 'CFL' && <ScheduleCFLTab schedules={schedules} warnings={warnings} />}
+      {/* Tabs */}
+      {activeTab === 'Salary'         && <SalaryTab s={s} overrides={overrides} />}
+      {activeTab === 'House Property' && <HousePropertyTab sv2={sv2} regime={selectedRegime} />}
+      {activeTab === 'Capital Gains'  && <CapitalGainsTab s={s} overrides={overrides} />}
+      {activeTab === 'Business'       && <BusinessTab s={s} broker={parsed.broker} overrides={overrides} />}
+      {activeTab === 'Other Sources'  && <OtherSourcesTab s={s} overrides={overrides} regime={selectedRegime} />}
 
-      <div className="mt-6 pt-4 border-t border-[var(--color-border)]">
-        <button onClick={() => navigate('/summary')} className="btn-primary">
-          Continue to tax summary <ArrowRightIcon />
+      {/* Footer */}
+      <div className="mt-6 pt-4 border-t border-ink-100 flex items-center justify-between">
+        <button onClick={() => navigate('/upload')} className="btn-secondary">← Back to upload</button>
+        <button onClick={() => navigate('/review/deductions')} className="btn-primary">
+          Continue to Deductions <ArrowRightIcon />
         </button>
       </div>
+
+      {warnings.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {warnings
+            .filter(w => w.id !== 'AIS_MISMATCH_RISK')
+            .map(w => <WarningBanner key={w.id} severity={w.severity} message={w.message} />)}
+        </div>
+      )}
     </div>
   )
 }
 
-// ─── Schedule S ───────────────────────────────────────────────────────────────
-function ScheduleSTab({ schedules, overrides, state }: any) {
-  const s = schedules?.S
-  if (!s) return <EmptySchedule />
-  const unresolvedFields: string[] = state?.parsed?.form16?.unresolvedFields ?? []
-  return (
-    <>
-    {unresolvedFields.length > 0 && (
-      <div className="banner-warn mb-4">
-        <span>⚠</span>
-        <div>
-          <p className="font-medium">Some Form 16 fields could not be mapped automatically</p>
-          <p className="text-xs mt-1">Please verify and manually enter values for: <span className="font-mono">{unresolvedFields.join(', ')}</span></p>
-          <p className="text-xs mt-1">Use the ✎ edit icon next to each field to enter the correct value.</p>
-        </div>
-      </div>
-    )}
-    <ScheduleSection title="Schedule S — Salary" source={s.source}>
-      <EditableField label="Gross salary" fieldPath="S.grossSalary" value={s.grossSalary} isOverridden={'S.grossSalary' in overrides} />
-      <EditableField label="Standard deduction u/s 16(ia)" fieldPath="S.standardDeduction" value={s.standardDeduction} isOverridden={false} fixed note="₹75,000" negative />
-      <EditableField label="Professional tax u/s 16(iii)" fieldPath="S.professionalTax" value={s.professionalTax} isOverridden={'S.professionalTax' in overrides} negative />
-      <SummaryRow label="Net taxable salary" value={s.netTaxableSalary} bold />
-    </ScheduleSection>
-    <ScheduleSection title="Advance Tax &amp; TDS">
-      <EditableField label="TDS deducted by employer" fieldPath="TAX.tdsDeducted" value={overrides['TAX.tdsDeducted'] ?? (state.parsed.form16?.tdsDeducted ?? 0)} isOverridden={'TAX.tdsDeducted' in overrides} />
-      <div className="py-2 border-b border-[var(--color-border)]">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-ink-700">Advance tax paid</span>
-          <div className="flex items-center gap-2">
-            <span className={`font-mono text-sm ${(overrides['TAX.advanceTaxPaid'] ?? 0) > 0 ? 'text-ink-900' : 'text-ink-300'}`}>
-              {(overrides['TAX.advanceTaxPaid'] ?? 0) > 0 ? '₹' + (overrides['TAX.advanceTaxPaid']).toLocaleString('en-IN') : '—'}
-            </span>
-            <AddFieldButton fieldPath="TAX.advanceTaxPaid" label="Enter amount" />
-          </div>
-        </div>
-      </div>
-    </ScheduleSection>
+// ─── Salary Tab ───────────────────────────────────────────────────────────────
 
-    {/* Unresolved Form 16 fields — show manual entry prompts */}
-    {state.parsed.form16?.unresolvedFields && state.parsed.form16.unresolvedFields.length > 0 && (
-      <div className="card border-amber-200 bg-amber-50">
-        <p className="font-medium text-amber-800 text-sm mb-2">
-          ⚠ Some Form 16 fields could not be mapped automatically
-        </p>
-        <p className="text-xs text-amber-700 mb-3">
-          The following labels were not recognised. Enter values manually using the edit controls above.
-        </p>
-        <div className="space-y-1">
-          {state.parsed.form16.unresolvedFields.map((label: string) => (
-            <p key={label} className="text-xs font-mono bg-white border border-amber-200 rounded px-2 py-1 text-amber-700">
-              {label}
-            </p>
-          ))}
-        </div>
-        <p className="text-xs text-amber-600 mt-2">
-          Tip: Cross-check these fields against your Form 16 PDF and enter the correct values above.
-        </p>
-      </div>
-    )}
-    </>
-  )
-}
-
-// ─── Schedule BP ─────────────────────────────────────────────────────────────
-function ScheduleBPTab({ schedules, overrides, warnings }: any) {
-  const bp = schedules?.BP
-  const intradayWarn = getWarning(warnings, 'INTRADAY_LOSS_RESTRICTION')
-  if (!bp) return <EmptySchedule />
+function SalaryTab({ s, overrides }: { s: any; overrides: Record<string, number> }) {
+  if (!s?.S) return <EmptyTab msg="No Form 16 parsed yet." />
+  const S = s.S
   return (
-    <ScheduleSection
-      title="Schedule BP — Intraday (Speculative)"
-      source="Broker Tax P&L · Equity Intraday"
-      warning={intradayWarn?.message}
-    >
-      <EditableField label="Speculative turnover" fieldPath="BP.speculativeTurnover" value={bp.speculativeTurnover} isOverridden={'BP.speculativeTurnover' in overrides} />
-      <EditableField label="Net P&L" fieldPath="BP.netSpeculativePnL" value={bp.netSpeculativePnL} isOverridden={'BP.netSpeculativePnL' in overrides} />
-      <SummaryRow label="Set-off this year" value={bp.setOffThisYear} />
-      <SummaryRow label="Carry forward to AY 2027-28" value={bp.carryForward} />
-    </ScheduleSection>
-  )
-}
-
-// ─── Schedule CG ─────────────────────────────────────────────────────────────
-function ScheduleCGTab({ schedules, overrides, warnings }: any) {
-  const cg = schedules?.CG
-  const ltcgWarn = getWarning(warnings, 'LTCG_EXEMPTION_CAP')
-  if (!cg) return <EmptySchedule />
-  return (
-    <>
-      <ScheduleSection title="Schedule CG — Capital Gains (Equity Delivery)" source="Broker Tax P&L · Equity" warning={ltcgWarn?.message}>
-        <EditableField label="STCG — equity delivery (Sec 111A)" fieldPath="CG.equitySTCG" value={cg.equitySTCG} isOverridden={'CG.equitySTCG' in overrides} />
-        <EditableField label="LTCG — equity delivery (Sec 112A)" fieldPath="CG.equityLTCG" value={cg.equityLTCG} isOverridden={'CG.equityLTCG' in overrides} />
-        <EditableField label="STCL (loss)" fieldPath="CG.equitySTCL" value={cg.stcl} isOverridden={'CG.equitySTCL' in overrides} negative />
-        <EditableField label="LTCL (loss)" fieldPath="CG.equityLTCL" value={cg.ltcl} isOverridden={'CG.equityLTCL' in overrides} negative />
-      </ScheduleSection>
-      <ScheduleSection title="Schedule CG — Capital Gains (MF)" source="MF Statement">
-        <EditableField label="STCG — equity MF (Sec 111A)" fieldPath="CG.mfEquitySTCG" value={cg.mfEquitySTCG} isOverridden={'CG.mfEquitySTCG' in overrides} />
-        <EditableField label="LTCG — equity MF (Sec 112A)" fieldPath="CG.mfEquityLTCG" value={cg.mfEquityLTCG} isOverridden={'CG.mfEquityLTCG' in overrides} />
-        <EditableField label="Debt MF gains (slab rate)" fieldPath="CG.debtMFGains" value={cg.debtMFGains} isOverridden={'CG.debtMFGains' in overrides} />
-      </ScheduleSection>
-      <ScheduleSection title="Capital Gains — Net after set-off">
-        <SummaryRow label="Gross STCG" value={cg.grossSTCG} />
-        <SummaryRow label="Gross LTCG" value={cg.grossLTCG} />
-        <SummaryRow label="LTCG exemption (Sec 112A)" value={-cg.ltcgExemption} />
-        <SummaryRow label="Net STCG (after set-off)" value={cg.netSTCG} bold />
-        <SummaryRow label="Taxable LTCG (after exemption)" value={cg.taxableLTCG} bold />
-      </ScheduleSection>
-    </>
-  )
-}
-
-// ─── Schedule OS ─────────────────────────────────────────────────────────────
-function ScheduleOSTab({ schedules, overrides }: any) {
-  const os = schedules?.OS
-  if (!os) return <EmptySchedule />
-  return (
-    <ScheduleSection title="Schedule OS — Other Sources" source="Broker Tax P&L · Dividends">
-      <EditableField label="Dividend income" fieldPath="OS.dividendIncome" value={os.dividendIncome} isOverridden={'OS.dividendIncome' in overrides} />
-      <div className="py-2 border-b border-[var(--color-border)]">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-ink-700">Interest income</span>
-          <div className="flex items-center gap-2">
-            <span className={`font-mono text-sm ${os.interestIncome > 0 ? 'text-ink-900' : 'text-ink-300'}`}>
-              {os.interestIncome > 0 ? '₹' + os.interestIncome.toLocaleString('en-IN') : '—'}
-            </span>
-            <AddFieldButton fieldPath="OS.interestIncome" label="Add interest income" />
-          </div>
-        </div>
-      </div>
-      <SummaryRow label="Total other sources" value={os.total} bold />
-    </ScheduleSection>
-  )
-}
-
-// ─── Schedule CYLA ────────────────────────────────────────────────────────────
-function AddFieldButton({ fieldPath, label }: { fieldPath: string; label: string }) {
-  const { setOverride } = useAppDispatch()
-  const [open, setOpen] = useState(false)
-  const [val, setVal] = useState('')
-  if (!open) return (
-    <button onClick={() => setOpen(true)} className="text-xs text-sky-600 hover:text-sky-800 underline">+ Add</button>
-  )
-  return (
-    <div className="flex items-center gap-1">
-      <span className="text-sm text-ink-400">₹</span>
-      <input
-        type="number"
-        value={val}
-        onChange={e => setVal(e.target.value)}
-        onBlur={() => { if (val) setOverride(fieldPath, parseFloat(val)); setOpen(false) }}
-        onKeyDown={e => { if (e.key === 'Enter' && val) { setOverride(fieldPath, parseFloat(val)); setOpen(false) } if (e.key === 'Escape') setOpen(false) }}
-        className="w-24 input-field text-right py-0.5 text-sm"
-        placeholder={label}
-        autoFocus
+    <ScheduleSection title="Schedule S — Salary Income" source="Form 16">
+      <EditableField
+        label="Gross salary"
+        fieldPath="S.grossSalary"
+        value={overrides['S.grossSalary'] ?? S.grossSalary}
+        isOverridden={'S.grossSalary' in overrides}
       />
+      <SummaryRow label="Standard deduction" value={-S.standardDeduction} muted />
+      <EditableField
+        label="Professional tax"
+        fieldPath="S.professionalTax"
+        value={-(overrides['S.professionalTax'] ?? S.professionalTax)}
+        isOverridden={'S.professionalTax' in overrides}
+      />
+      <div className="border-t border-ink-100 mt-2 pt-2">
+        <SummaryRow label="Net taxable salary" value={S.netTaxableSalary} bold />
+        <SummaryRow label="TDS deducted" value={s.parsed?.tdsDeducted ?? S.tdsDeducted ?? 0} muted />
+      </div>
+    </ScheduleSection>
+  )
+}
+
+// ─── House Property Tab ───────────────────────────────────────────────────────
+
+function HousePropertyTab({ sv2, regime }: { sv2: any; regime: string }) {
+  if (!sv2?.HP?.properties?.length) {
+    return <EmptyTab msg="No house property added. Property income can be entered manually in a future update." />
+  }
+  const hp = sv2.HP
+  return (
+    <div className="space-y-3">
+      {hp.properties.map((p: any) => (
+        <ScheduleSection
+          key={p.id}
+          title={`${p.propertyType === 'self_occupied' ? 'Self-Occupied' : 'Let-Out'} — ${p.address || 'Property'}`}
+          source="Manual entry"
+        >
+          <SummaryRow label="Annual rent received" value={p.annualRentReceived} />
+          <SummaryRow label="Municipal taxes paid" value={-p.municipalTaxPaid} muted />
+          <SummaryRow label="Net Annual Value" value={p.netAnnualValue} />
+          {p.standardDeduction30pct > 0 && (
+            <SummaryRow label="Standard deduction (30%)" value={-p.standardDeduction30pct} muted />
+          )}
+          <SummaryRow label="Interest on loan" value={-p.interestOnLoan} muted />
+          <div className="border-t border-ink-100 mt-2 pt-2">
+            <SummaryRow label="Income from HP" value={p.incomeFromHP} bold positive={p.incomeFromHP >= 0} />
+          </div>
+        </ScheduleSection>
+      ))}
+      {hp.totalIncomeFromHP < 0 && (
+        <WarningBanner
+          severity="info"
+          message={regime === 'new'
+            ? 'Under New Regime, HP loss is ring-fenced — cannot offset salary or capital gains.'
+            : `HP loss of ${fmtINR(Math.abs(hp.totalIncomeFromHP))} can be set off against salary income (up to ₹2L).`}
+        />
+      )}
+      <div className="card">
+        <SummaryRow label="Total income from HP" value={hp.totalIncomeFromHP} bold positive={hp.totalIncomeFromHP >= 0} />
+      </div>
     </div>
   )
 }
 
-function ScheduleCYLATab({ schedules }: any) {
-  const cyla = schedules?.CYLA
-  if (!cyla) return <EmptySchedule />
+// ─── Capital Gains Tab ────────────────────────────────────────────────────────
+
+function CapitalGainsTab({ s, overrides }: { s: any; overrides: Record<string, number> }) {
+  const [cgTab, setCGTab] = useState<'Equity' | 'MF'>('Equity')
+  if (!s?.CG) return <EmptyTab msg="No capital gains data parsed." />
+  const cg = s.CG
+
   return (
-    <ScheduleSection title="Schedule CYLA — Current Year Loss Adjustment">
-      <div className="py-2 text-xs text-ink-400 border-b border-[var(--color-border)]">
-        Loss set-off rules: intraday loss is ring-fenced · STCL sets off against STCG then LTCG · LTCL sets off against LTCG only
+    <div>
+      <div className="flex gap-1 mb-3">
+        {(['Equity', 'MF'] as const).map(t => (
+          <button key={t} onClick={() => setCGTab(t)}
+            className={`px-3 py-1 text-xs rounded-lg font-medium ${cgTab === t ? 'bg-ink-900 text-white' : 'bg-ink-100 text-ink-600 hover:bg-ink-200'}`}>
+            {t === 'MF' ? 'Mutual Funds' : 'Equity Delivery'}
+          </button>
+        ))}
       </div>
-      <SummaryRow label="Net salary income" value={cyla.netSalaryIncome} />
-      <SummaryRow label="Net intraday income" value={cyla.netIntradayIncome} />
-      <SummaryRow label="Net STCG (post set-off)" value={cyla.netSTCG} />
-      <SummaryRow label="Net LTCG (post set-off)" value={cyla.netLTCG} />
-      <SummaryRow label="Net other sources" value={cyla.netOtherSources} />
-      {cyla.setOffs.remainingIntradayLoss > 0 && (
-        <div className="py-2 text-xs text-amber-600">
-          ⚠ Intraday loss {fmtINR(cyla.setOffs.remainingIntradayLoss)} unabsorbed → carries forward
-        </div>
+
+      {cgTab === 'Equity' && (
+        <ScheduleSection title="Equity Delivery" source="Broker P&L">
+          <EditableField label="STCG (Sec 111A @ 20%)" fieldPath="CG.equitySTCG"
+            value={overrides['CG.equitySTCG'] ?? cg.equitySTCG} isOverridden={'CG.equitySTCG' in overrides} />
+          <EditableField label="LTCG above ₹1.25L (@ 12.5%)" fieldPath="CG.equityLTCG"
+            value={overrides['CG.equityLTCG'] ?? cg.equityLTCG} isOverridden={'CG.equityLTCG' in overrides} />
+          {(cg.stcl > 0 || cg.ltcl > 0) && (
+            <div className="mt-2 pt-2 border-t border-ink-100">
+              <SummaryRow label="STCL carry-forward" value={cg.stcl} muted />
+              <SummaryRow label="LTCL carry-forward" value={cg.ltcl} muted />
+            </div>
+          )}
+        </ScheduleSection>
       )}
+
+      {cgTab === 'MF' && (
+        <ScheduleSection title="Equity Mutual Funds" source="CAMS / KFintech">
+          <EditableField label="STCG" fieldPath="CG.mfEquitySTCG"
+            value={overrides['CG.mfEquitySTCG'] ?? cg.mfEquitySTCG} isOverridden={'CG.mfEquitySTCG' in overrides} />
+          <EditableField label="LTCG above ₹1.25L" fieldPath="CG.mfEquityLTCG"
+            value={overrides['CG.mfEquityLTCG'] ?? cg.mfEquityLTCG} isOverridden={'CG.mfEquityLTCG' in overrides} />
+          {cg.debtMFGains !== 0 && (
+            <div className="mt-2 pt-2 border-t border-ink-100">
+              <SummaryRow label="Debt MF gains (slab rate)" value={cg.debtMFGains} />
+            </div>
+          )}
+        </ScheduleSection>
+      )}
+
+      <div className="card mt-3">
+        <SummaryRow label="Net STCG" value={cg.netSTCG ?? (cg.equitySTCG + cg.mfEquitySTCG)} bold />
+        <SummaryRow label="Net LTCG" value={cg.netLTCG ?? cg.taxableLTCG} bold />
+      </div>
+    </div>
+  )
+}
+
+// ─── Business Tab ─────────────────────────────────────────────────────────────
+
+function BusinessTab({ s, broker, overrides }: { s: any; broker: any; overrides: Record<string, number> }) {
+  const bp = s?.BP
+  const hasFnO = broker?.hasFnO ?? false
+  if (!bp && !hasFnO) return <EmptyTab msg="No business income data." />
+
+  return (
+    <div className="space-y-3">
+      {bp && (
+        <ScheduleSection title="Intraday (Speculative)" source="Broker P&L">
+          <EditableField label="Turnover (absolute sum of P&L)" fieldPath="BP.speculativeTurnover"
+            value={overrides['BP.speculativeTurnover'] ?? bp.speculativeTurnover}
+            isOverridden={'BP.speculativeTurnover' in overrides} />
+          <EditableField label="Net P&L" fieldPath="BP.netSpeculativePnL"
+            value={overrides['BP.netSpeculativePnL'] ?? bp.netSpeculativePnL}
+            isOverridden={'BP.netSpeculativePnL' in overrides} />
+          {bp.netSpeculativePnL < 0 && (
+            <p className="text-xs text-amber-600 mt-1">⚠ Intraday loss is ring-fenced — cannot offset salary or capital gains.</p>
+          )}
+          {bp.carryForward > 0 && (
+            <SummaryRow label="Loss carried forward" value={bp.carryForward} muted />
+          )}
+        </ScheduleSection>
+      )}
+
+      {hasFnO && (
+        <ScheduleSection title="F&O" source="Broker P&L">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+            <p className="font-medium">⚠ F&O income detected — computation skipped.</p>
+            <p className="text-xs mt-1">Enter taxable F&O income manually after consulting a CA.</p>
+          </div>
+          <div className="mt-2">
+            <EditableField label="F&O taxable income (manual)" fieldPath="BP.fnoIncome"
+              value={overrides['BP.fnoIncome'] ?? 0} isOverridden={'BP.fnoIncome' in overrides} />
+          </div>
+        </ScheduleSection>
+      )}
+    </div>
+  )
+}
+
+// ─── Other Sources Tab ────────────────────────────────────────────────────────
+
+function OtherSourcesTab({ s, overrides, regime }: { s: any; overrides: Record<string, number>; regime: string }) {
+  if (!s?.OS) return <EmptyTab msg="No other income data." />
+  const os = s.OS
+
+  return (
+    <ScheduleSection title="Schedule OS — Other Sources">
+      <EditableField label="Dividend income" fieldPath="OS.dividendIncome"
+        value={overrides['OS.dividendIncome'] ?? os.dividendIncome}
+        isOverridden={'OS.dividendIncome' in overrides} />
+      <EditableField label="Interest income" fieldPath="OS.interestIncome"
+        value={overrides['OS.interestIncome'] ?? os.interestIncome}
+        isOverridden={'OS.interestIncome' in overrides} />
+      {regime === 'old' && (
+        <p className="text-xs text-ink-400 mt-1">Savings interest up to ₹10,000 eligible for 80TTA deduction on the Deductions screen.</p>
+      )}
+      <div className="border-t border-ink-100 mt-2 pt-2">
+        <SummaryRow label="Total other sources" value={os.total} bold />
+      </div>
     </ScheduleSection>
   )
 }
 
-// ─── Schedule CFL ─────────────────────────────────────────────────────────────
-function ScheduleCFLTab({ schedules, warnings }: any) {
-  const cfl = schedules?.CFL
-  const cflWarn = getWarning(warnings, 'CARRY_FORWARD_DEADLINE')
-  if (!cfl) return <EmptySchedule />
-  return (
-    <ScheduleSection title="Schedule CFL — Carry Forward Losses" warning={cflWarn?.message}>
-      <SummaryRow label={`Intraday loss → AY ${cfl.targetAY} (up to 4 years)`} value={cfl.intradayLossCarryForward} />
-      <SummaryRow label={`STCL → AY ${cfl.targetAY} (up to 8 years)`} value={cfl.stclCarryForward} />
-      <SummaryRow label={`LTCL → AY ${cfl.targetAY} (up to 8 years)`} value={cfl.ltclCarryForward} />
-      {cfl.intradayLossCarryForward === 0 && cfl.stclCarryForward === 0 && cfl.ltclCarryForward === 0 && (
-        <div className="py-3 text-sm text-ink-400 text-center">No losses to carry forward.</div>
-      )}
-    </ScheduleSection>
-  )
-}
+// ─── Empty tab card ───────────────────────────────────────────────────────────
 
-function EmptySchedule() {
+function EmptyTab({ msg }: { msg: string }) {
   return (
-    <div className="card text-center py-10 text-ink-400">
-      <p className="text-sm">Schedule data will appear after parsing.</p>
+    <div className="card text-center py-8">
+      <p className="text-sm text-ink-400">{msg}</p>
     </div>
   )
 }

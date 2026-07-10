@@ -6,8 +6,10 @@
       "required": true,
       "multiple": false,
       "maxCount": 1,
-      "formats": [".xlsx"],
-      "hint": "Zerodha / Groww / Upstox → Console → Tax P&L",
+      "formats": [
+        ".xlsx"
+      ],
+      "hint": "Zerodha / Groww / Upstox \u2192 Console \u2192 Tax P&L",
       "parsedBadge": "broker_name_detected",
       "errorOnMissing": "Required to compute capital gains and intraday income"
     },
@@ -17,8 +19,10 @@
       "required": true,
       "multiple": true,
       "maxCount": 5,
-      "formats": [".pdf"],
-      "hint": "From employer — text-based only. Add one per employer.",
+      "formats": [
+        ".pdf"
+      ],
+      "hint": "From employer \u2014 text-based only. Add one per employer.",
       "parsedBadge": "employer_name_detected",
       "addMoreLabel": "Add another Form 16",
       "errorOnMissing": "Required to compute salary income and TDS"
@@ -29,8 +33,11 @@
       "required": false,
       "multiple": false,
       "maxCount": 1,
-      "formats": [".json", ".pdf"],
-      "hint": "CAMS / KFintech — JSON format preferred",
+      "formats": [
+        ".json",
+        ".pdf"
+      ],
+      "hint": "CAMS / KFintech \u2014 JSON format preferred",
       "parsedBadge": "scheme_count_detected"
     },
     {
@@ -39,8 +46,11 @@
       "required": false,
       "multiple": false,
       "maxCount": 1,
-      "formats": [".pdf", ".xlsx"],
-      "hint": "TRACES → View 26AS → Download",
+      "formats": [
+        ".pdf",
+        ".xlsx"
+      ],
+      "hint": "TRACES \u2192 View 26AS \u2192 Download",
       "parsedBadge": "tds_entry_count"
     },
     {
@@ -49,8 +59,11 @@
       "required": false,
       "multiple": false,
       "maxCount": 1,
-      "formats": [".json", ".pdf"],
-      "hint": "IT portal → AIS → Download JSON",
+      "formats": [
+        ".json",
+        ".pdf"
+      ],
+      "hint": "IT portal \u2192 AIS \u2192 Download JSON",
       "parsedBadge": "ais_salary_detected"
     },
     {
@@ -59,9 +72,12 @@
       "required": false,
       "multiple": false,
       "maxCount": 1,
-      "formats": [".xml"],
-      "hint": "Your AY 2025-26 filed ITR XML — for carry-forward losses",
-      "parsedBadge": "cfl_entry_count"
+      "formats": [
+        ".json",
+        ".xml"
+      ],
+      "hint": "IT portal \u2192 e-File \u2192 View Filed Returns \u2192 Download JSON or XML",
+      "parsedBadge": "cfl_entries_found"
     }
   ]
 }

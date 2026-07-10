@@ -326,13 +326,110 @@ describe('T77 · parsePriorITRXML — expiry filtering', () => {
 })
 
 describe('T77 · parsePriorITRXML — error handling', () => {
-  it('rejects non-XML file extension', async () => {
+  it('rejects unsupported file extensions (only .json and .xml accepted)', async () => {
     const file = new File(['dummy'], 'itr.pdf', { type: 'application/pdf' })
-    await expect(parsePriorITRXML(file)).rejects.toThrow(/must be an XML file/)
+    // Now accepts .json and .xml — .pdf should still be rejected
+    await expect(parsePriorITRXML(file)).rejects.toThrow(/Unsupported format/)
   })
 
   it('rejects file that does not look like ITR XML', async () => {
     const file = makeXMLFile('<root><name>Hello</name></root>')
     await expect(parsePriorITRXML(file)).rejects.toThrow()
+  })
+})
+
+// ─── T77 (extended): JSON format tests ───────────────────────────────────────
+
+function makeJSONFile(data: object): File {
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' })
+  return new File([blob], 'itr_ay2025_26.json', { type: 'application/json' })
+}
+
+describe('T77 · parsePriorITR — JSON format (IT Portal new default)', () => {
+  it('extracts CFL entries from IT Portal JSON format (ITR wrapped in ITR3 key)', async () => {
+    const { parsePriorITR } = await import('../../parsers/priorITRParser')
+    const jsonData = {
+      ITR: {
+        ITR3: {
+          PersonalInfo: { AssessmentYear: '2025-26' },
+          ScheduleCFL: {
+            LossCFSpecBus: 18500,
+            LossCFSTC: 12000,
+            LossCFLTC: 0,
+            LossCFHP: 0,
+            LossCFBusiness: 0,
+          }
+        }
+      }
+    }
+    const file = makeJSONFile(jsonData)
+    const entries = await parsePriorITR(file)
+    expect(entries.length).toBeGreaterThanOrEqual(1)
+    const spec = entries.find(e => e.lossType === 'speculative')
+    expect(spec).toBeDefined()
+    expect(spec!.amount).toBe(18500)
+    expect(spec!.source).toBe('prior_itr')
+    const stcl = entries.find(e => e.lossType === 'stcl')
+    expect(stcl).toBeDefined()
+    expect(stcl!.amount).toBe(12000)
+  })
+
+  it('handles flat JSON without ITR wrapper key', async () => {
+    const { parsePriorITR } = await import('../../parsers/priorITRParser')
+    const jsonData = {
+      AssessmentYear: '2025-26',
+      ScheduleCFL: {
+        LossCFSTC: 25000,
+        LossCFLTC: 10000,
+      }
+    }
+    const file = makeJSONFile(jsonData)
+    const entries = await parsePriorITR(file)
+    const stcl = entries.find(e => e.lossType === 'stcl')
+    expect(stcl?.amount).toBe(25000)
+    expect(stcl?.yearsRemaining).toBe(7)  // 8 years - 1 elapsed
+  })
+
+  it('filters expired speculative loss from old JSON (> 4 years)', async () => {
+    const { parsePriorITR } = await import('../../parsers/priorITRParser')
+    const jsonData = {
+      ITR: {
+        ITR3: {
+          PersonalInfo: { AssessmentYear: '2019-20' },  // 7 years ago
+          ScheduleCFL: {
+            LossCFSpecBus: 10000,  // speculative: 4yr limit → expired
+            LossCFSTC: 5000,       // capital: 8yr limit → 1 year left (barely valid)
+          }
+        }
+      }
+    }
+    const file = makeJSONFile(jsonData)
+    const entries = await parsePriorITR(file)
+    expect(entries.find(e => e.lossType === 'speculative')).toBeUndefined()
+    const stcl = entries.find(e => e.lossType === 'stcl')
+    expect(stcl?.yearsRemaining).toBe(1)
+  })
+
+  it('returns empty array when no CFL schedule exists (ITR-1 filer)', async () => {
+    const { parsePriorITR } = await import('../../parsers/priorITRParser')
+    const jsonData = {
+      ITR: { ITR1: { PersonalInfo: { AssessmentYear: '2025-26' } } }
+    }
+    const file = makeJSONFile(jsonData)
+    const entries = await parsePriorITR(file)
+    expect(entries).toHaveLength(0)
+  })
+
+  it('rejects malformed JSON', async () => {
+    const { parsePriorITR } = await import('../../parsers/priorITRParser')
+    const blob = new Blob(['{ invalid json :::'], { type: 'application/json' })
+    const file = new File([blob], 'itr.json')
+    await expect(parsePriorITR(file)).rejects.toThrow(/malformed/)
+  })
+
+  it('rejects unsupported extensions (.csv)', async () => {
+    const { parsePriorITR } = await import('../../parsers/priorITRParser')
+    const file = new File(['dummy'], 'itr.csv')
+    await expect(parsePriorITR(file)).rejects.toThrow(/Unsupported format/)
   })
 })

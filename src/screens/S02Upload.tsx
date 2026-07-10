@@ -57,10 +57,14 @@ export default function S02Upload() {
   const form16Reg  = documentRegistry.documents.find(d => d.id === 'form16')!
   const maxForm16  = form16Reg.maxCount ?? 5
 
-  // Gate: brokerPL + at least one valid form16
+  // Filer type: salaried users must upload Form 16; business/freelance users can skip it
+  const [filerType, setFilerType] = useState<'salaried' | 'business' | null>(null)
+  const form16Required = filerType === 'salaried' || filerType === null  // default to required until user selects
+
+  // Gate: brokerPL always required; Form 16 only required for salaried filers
   const allRequired =
     brokerSlot.status === 'valid' &&
-    form16Slots.some(s => s.status === 'valid')
+    (!form16Required || form16Slots.some(s => s.status === 'valid'))
 
   // ── Broker handler ──────────────────────────────────────────────────────────
   async function handleBrokerFile(file: File) {
@@ -171,12 +175,13 @@ export default function S02Upload() {
   }
 
   function handlePrevITRFile(file: File) {
-    if (!file.name.match(/\.xml$/i)) {
-      setPrevITRSlot({ file, status: 'error', errorMsg: 'Upload .xml downloaded from IT Portal → e-File → View Filed Returns' })
+    if (!file.name.match(/\.(xml|json)$/i)) {
+      setPrevITRSlot({ file, status: 'error', errorMsg: 'Upload .json or .xml from IT Portal → e-File → View Filed Returns → Download' })
       return
     }
     filesRef.current.previousITR = file
-    setPrevITRSlot({ file, status: 'valid', badge: 'Prior ITR XML — carry-forward extraction pending' })
+    const fmt = file.name.endsWith('.json') ? 'JSON' : 'XML'
+    setPrevITRSlot({ file, status: 'valid', badge: `Prior ITR ${fmt} — carry-forward extraction pending` })
   }
 
   // ── Navigate to parsing ─────────────────────────────────────────────────────
@@ -210,7 +215,39 @@ export default function S02Upload() {
       <StepProgress />
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink-900 mb-1">Upload your documents</h1>
-        <p className="text-ink-500 text-sm">Step 1 of 5 — Broker P&L and Form 16 are required</p>
+        <p className="text-ink-500 text-sm">Step 1 of 5 — {form16Required ? 'Broker P\u0026L and Form 16 are required' : 'Broker P\u0026L required, Form 16 optional'}</p>
+      </div>
+
+      {/* ── Filer type selector ── */}
+      <div className="card mb-4">
+        <p className="text-sm font-semibold text-ink-800 mb-3">What best describes you?</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setFilerType('salaried')}
+            className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
+              filerType === 'salaried'
+                ? 'bg-ink-900 text-white border-ink-900'
+                : 'bg-ink-50 text-ink-700 border-ink-200 hover:border-ink-400'
+            }`}
+          >
+            🏢 Salaried employee
+            <p className="text-xs font-normal mt-0.5 opacity-70">Form 16 required</p>
+          </button>
+          <button
+            onClick={() => setFilerType('business')}
+            className={`flex-1 py-2.5 px-3 rounded-lg border text-sm font-medium transition-colors ${
+              filerType === 'business'
+                ? 'bg-ink-900 text-white border-ink-900'
+                : 'bg-ink-50 text-ink-700 border-ink-200 hover:border-ink-400'
+            }`}
+          >
+            💼 Business / Freelance
+            <p className="text-xs font-normal mt-0.5 opacity-70">No Form 16 needed</p>
+          </button>
+        </div>
+        {filerType === 'business' && (
+          <p className="text-xs text-ink-400 mt-2">Presumptive income (44AD/44ADA), F&O traders, consultants. Enter income manually on the Income screen.</p>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -252,9 +289,12 @@ export default function S02Upload() {
         {/* 2. Form 16 — multi-slot */}
         <div className="card">
           <div className="flex items-center gap-2 mb-1">
-            <StepBadge n={2} done={form16Slots.some(s => s.status === 'valid')} required />
+            <StepBadge n={2} done={form16Slots.some(s => s.status === 'valid')} required={form16Required} />
             <h2 className="font-medium text-ink-900">Form 16</h2>
             <span className="text-xs text-ink-400">· one per employer</span>
+            {!form16Required && (
+              <span className="ml-1 text-xs font-normal text-ink-400 bg-ink-100 px-2 py-0.5 rounded-full">Optional — business filer</span>
+            )}
           </div>
           <p className="text-xs text-ink-300 font-mono mb-3">From employer — text-based PDF only · AY 2026-27</p>
 
@@ -341,13 +381,13 @@ export default function S02Upload() {
           onRemove={() => { setAISSlot(idle()); filesRef.current.ais = null }}
         />
 
-        {/* 6. Previous Year ITR XML */}
+        {/* 6. Previous Year ITR (JSON preferred / XML) */}
         <DocumentCard
           n={6}
-          label="Previous Year ITR XML"
-          hint="Your AY 2025-26 filed ITR XML"
-          subhint="IT portal → e-File → View Filed Returns → Download XML"
-          formats=".xml"
+          label="Previous Year ITR"
+          hint="Your AY 2025-26 filed ITR (.json or .xml)"
+          subhint="IT portal → e-File → View Filed Returns → Download JSON or Download XML"
+          formats=".json, .xml"
           slot={prevITRSlot}
           onFile={handlePrevITRFile}
           onRemove={() => { setPrevITRSlot(idle()); filesRef.current.previousITR = null }}
@@ -359,7 +399,7 @@ export default function S02Upload() {
           Parse documents <ArrowRightIcon />
         </button>
         {!allRequired && (
-          <p className="text-xs text-ink-400 mt-2">Upload Broker P&L and at least one Form 16 to continue</p>
+          <p className="text-xs text-ink-400 mt-2">form16Required ? 'Upload Broker P&L and at least one Form 16 to continue' : 'Upload Broker P&L to continue'</p>
         )}
       </div>
     </div>

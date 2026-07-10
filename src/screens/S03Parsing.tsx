@@ -245,8 +245,7 @@ export default function S03Parsing() {
         const { parseForm26AS } = await import('../parsers/form26ASParser')
         setF26asStatus(s => ({ ...s, milestones: s.milestones.map((m, i) => i === 0 ? { ...m, done: true } : m) }))
         const result = await parseForm26AS(form26ASFile)
-        setParsedForm26AS(result)
-        dispatch({ type: 'SET_PARSE_STATUS', key: 'brokerPL', status: 'done' }) // reuse key to signal done
+        dispatch({ type: 'SET_PARSED_FORM26AS', data: result })
         setF26asStatus({ state: 'done', milestones: [
           { label: 'Format detected', done: true },
           { label: `Part A — ${result.partA.length} TDS entries`, done: true },
@@ -269,7 +268,7 @@ export default function S03Parsing() {
       try {
         const { parseAIS } = await import('../parsers/aisParser')
         const result = await parseAIS(aisFile)
-        setParsedAIS(result)
+        dispatch({ type: 'SET_PARSED_AIS', data: result })
         setAISStatus({ state: 'done', milestones: [
           { label: 'AIS data loaded', done: true },
           { label: `${result.salary.length} salary · ${result.dividends.length} dividend entries`, done: true },
@@ -290,9 +289,9 @@ export default function S03Parsing() {
         { label: 'Filtering expired entries', done: false },
       ]})
       try {
-        const { parsePriorITRXML } = await import('../parsers/priorITRParser')
-        const entries = await parsePriorITRXML(prevITRFile)
-        setParsedPriorCFL(entries)
+        const { parsePriorITR } = await import('../parsers/priorITRParser')
+        const entries = await parsePriorITR(prevITRFile)
+        dispatch({ type: 'SET_PRIOR_ITR_CFL', entries })
         setPrevITRStatus({ state: 'done', milestones: [
           { label: 'XML parsed', done: true },
           { label: `${entries.length} carry-forward ${entries.length === 1 ? 'entry' : 'entries'} found`, done: true },
@@ -356,7 +355,7 @@ export default function S03Parsing() {
           onRetry={() => navigate('/upload')}
         />
         <ParseProgressCard
-          title="Previous Year ITR XML"
+          title="Previous Year ITR (JSON / XML)"
           status={prevITRStatus.state}
           milestones={prevITRStatus.milestones}
           errorMsg={prevITRStatus.error}

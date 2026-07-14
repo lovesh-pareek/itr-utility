@@ -27,7 +27,7 @@
 import { describe, it, expect } from 'vitest'
 
 // Engine
-import { computeTax, computeTax_v2 } from '../taxComputation'
+import { computeTax_v2 } from '../taxComputation'
 import { computeDeductionsVI_A, emptyRawDeductions } from '../deductionsEngine'
 import { computeTaxCredits, emptyTaxCredits, validateBankAccountSet } from '../taxCreditsEngine'
 import { computeRegimeComparison, computeFilerCategory } from '../regimeComparison'
@@ -442,13 +442,41 @@ describe('Real Data — XML Generation', () => {
       const slabIncome = FORM16.netTaxableSalary + BROKER.dividendTotal
       const d = emptyRawDeductions(FORM16.grossSalary)
       const ded = computeDeductionsVI_A(d, 'new', 'general')
-      return computeTax_v2(slabIncome, 0, 0, 0, ded, emptyTaxCredits(), 'new')
+      // Use the real TDS credits from Form 16 (not empty credits) so the
+      // generated XML reflects the actual ₹8,27,194 TDS deducted.
+      const credits = computeTaxCredits(
+        [{ id: 't1', tanDeductor: FORM16.tanEmployer, deductorName: FORM16.employerName, grossAmount: FORM16.grossSalary, tdsAmount: FORM16.tdsDeducted, section: '192', source: 'form16' }],
+        [], []
+      )
+      return computeTax_v2(slabIncome, 0, 0, 0, ded, credits, 'new')
     })(),
     schedules: {
       S: { grossSalary: FORM16.grossSalary, standardDeduction: FORM16.standardDeduction, professionalTax: 0, netTaxableSalary: FORM16.netTaxableSalary },
       OS: { dividendIncome: BROKER.dividendTotal, interestIncome: 0, total: BROKER.dividendTotal },
       CG: { equitySTCG: 0, equityLTCG: 0, mfEquitySTCG: 0, mfEquityLTCG: 0, debtMFGains: 0, netSTCG: 0, taxableLTCG: 0, ltcgExemption: 0, stcl: Math.abs(BROKER.stcg), ltcl: Math.abs(BROKER.ltcg) },
       BP: { speculativeTurnover: BROKER.intradayTurnover, netSpeculativePnL: BROKER.intradayPL, carryForward: Math.abs(BROKER.intradayPL), hasFnO: true },
+      // All CG/intraday positions are losses this year, so nothing is absorbed —
+      // everything carries forward via CFL. Salary and OS pass through untouched
+      // (mirrors computeScheduleCYLA's real output for this profile).
+      CYLA: {
+        setOffs: {
+          intradayProfitAbsorbed: 0, stcgAbsorbed: 0, ltcgAbsorbed: 0,
+          remainingIntradayLoss: Math.abs(BROKER.intradayPL),
+          remainingSTCL: Math.abs(BROKER.stcg),
+          remainingLTCL: Math.abs(BROKER.ltcg),
+        },
+        netSalaryIncome: FORM16.netTaxableSalary,
+        netIntradayIncome: 0,
+        netSTCG: 0,
+        netLTCG: 0,
+        netOtherSources: BROKER.dividendTotal,
+      },
+      CFL: {
+        intradayLossCarryForward: Math.abs(BROKER.intradayPL),
+        stclCarryForward: Math.abs(BROKER.stcg),
+        ltclCarryForward: Math.abs(BROKER.ltcg),
+        targetAY: '2026-27',
+      },
     } as any,
     parsed: {
       ...initialState.parsed,
@@ -564,8 +592,9 @@ describe('Real Data — Edge Cases & Boundary Conditions', () => {
   it('no surcharge applicable (income ₹40.5L < ₹50L threshold)', () => {
     const income = FORM16.netTaxableSalary + BROKER.dividendTotal
     const r = getRules('2026-27', 'new')
-    // Surcharge kicks in at 50L
-    const threshold = r.surchargeThresholds?.basic ?? 5_000_000
+    // First surcharge tier with a non-zero rate marks where surcharge starts kicking in.
+    const firstSurchargedTier = r.surcharge.find((tier) => tier.rate > 0)
+    const threshold = firstSurchargedTier?.from ?? 5_000_000
     expect(income).toBeLessThan(threshold)
   })
 })

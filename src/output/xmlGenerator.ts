@@ -26,6 +26,10 @@ export function generateITR3XML(state: AppState): XMLResult {
   if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) errors.push(`PAN format invalid: ${pan}`)
   if (schedules.S.grossSalary === 0 && !parsed.broker && !parsed.mfStatement)
     errors.push('No income data found — verify parsed documents')
+  if (!schedules.CYLA || typeof schedules.CYLA.netSalaryIncome !== 'number')
+    errors.push('Schedule CYLA not computed — re-run the tax engine before generating XML')
+  if (!schedules.CFL || typeof schedules.CFL.intradayLossCarryForward !== 'number')
+    errors.push('Schedule CFL not computed — re-run the tax engine before generating XML')
 
   if (errors.length > 0) {
     return { xml: '', valid: false, errors }

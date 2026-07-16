@@ -45,7 +45,7 @@ export function computeTax(
   const taxableLTCG = CG.taxableLTCG  // already net of exemption
 
   // ── Step 3: Total income (for surcharge threshold) ────────────────────────
-  const totalIncome = slabTaxableIncome + netSTCG + CG.netLTCG + CG.debtMFGains
+  const totalIncome = slabTaxableIncome + netSTCG + CG.netLTCG
 
   // ── Step 4: Slab tax ──────────────────────────────────────────────────────
   let slabTaxRaw = computeSlabTaxFromConfig(slabTaxableIncome, rules.slabs)

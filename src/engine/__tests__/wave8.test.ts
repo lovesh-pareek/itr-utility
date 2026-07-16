@@ -380,7 +380,7 @@ describe('T52 — Warning conditions', () => {
       computeTax(computeSchedules(broker, makeForm16(10_75_000, 0), makeEmptyMF(), {}), 0, 0)
     )
     const fnoWarn = warnings.find(w => w.id === 'FNO_DETECTED')
-    expect(fnoWarn?.severity).toBe('warn')  // not 'error' — doesn't block
+    expect(fnoWarn?.severity).toBe('info')  // informational — user can enter F&O income
   })
 
   it('Carry-forward deadline warning shows correct date', () => {

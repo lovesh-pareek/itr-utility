@@ -37,8 +37,11 @@ export function computeSchedules(
   // Track C: intraday speculative income
   const scheduleBP = computeScheduleBP(broker, overrides)
 
-  // CYLA: cross-head loss adjustment (uses all schedules)
-  const scheduleCYLA = computeScheduleCYLA(scheduleS, scheduleBP, scheduleCG, scheduleOS)
+  // F&O taxable income (user-entered override)
+  const fnoTaxableIncome = overrides['BP.fnoIncome'] ?? overrides['BP_v2.fno.taxableIncome'] ?? 0
+
+  // CYLA: cross-head loss adjustment (uses all schedules + F&O)
+  const scheduleCYLA = computeScheduleCYLA(scheduleS, scheduleBP, scheduleCG, scheduleOS, fnoTaxableIncome)
 
   // CFL: carry forward from residual losses after CYLA
   const scheduleCFL = computeScheduleCFL(scheduleCYLA)

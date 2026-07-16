@@ -6,12 +6,13 @@ import type { ScheduleBP, ScheduleCG, ScheduleS, ScheduleOS, ScheduleCYLA } from
  * Rules (ITR-3, New Regime):
  *   1. Intraday (speculative) loss → ONLY against intraday (speculative) profit.
  *      Cannot be set off against salary, capital gains, or other sources.
- *   2. STCL → against STCG first, then against LTCG.
+ *   2. Non-speculative business loss (incl. F&O) → can offset OS, CG (not salary).
+ *   3. STCL → against STCG first, then against LTCG.
  *      (Intra-CG set-off already done in computeScheduleCG; CYLA handles any residual
  *       that crosses into other heads — for STCL/LTCL that's not applicable cross-head,
  *       so this mainly records what's remaining after intra-CG set-off.)
- *   3. LTCL → ONLY against LTCG. Cannot offset anything else.
- *   4. Salary income cannot be reduced by any capital or intraday losses.
+ *   4. LTCL → ONLY against LTCG. Cannot offset anything else.
+ *   5. Salary income cannot be reduced by any capital or intraday losses.
  *
  * NOTE: Debt MF gains are slab-rate income — they add to slab-taxable income
  * alongside salary. No special treatment in CYLA.
@@ -20,7 +21,8 @@ export function computeScheduleCYLA(
   scheduleS: ScheduleS,
   scheduleBP: ScheduleBP,
   scheduleCG: ScheduleCG,
-  scheduleOS: ScheduleOS
+  scheduleOS: ScheduleOS,
+  fnoTaxableIncome = 0
 ): ScheduleCYLA {
   // ── Intraday (speculative) set-off ────────────────────────────────────────
   // Loss can only offset speculative profit — and there is no speculative profit
@@ -39,13 +41,40 @@ export function computeScheduleCYLA(
     remainingIntradayLoss = Math.abs(intradayPnL)
   }
 
+  // ── F&O / Non-speculative business loss set-off ────────────────────────────
+  // F&O loss is non-speculative — can offset OS, STCG, LTCG (not salary)
+  let netOtherSources = scheduleOS.total
+  let netSTCGAfterBusLoss = scheduleCG.netSTCG
+  let netLTCGAfterBusLoss = scheduleCG.netLTCG
+
+  if (fnoTaxableIncome < 0) {
+    let remainingLoss = Math.abs(fnoTaxableIncome)
+
+    // First offset against Other Sources
+    const absorbedFromOS = Math.min(remainingLoss, netOtherSources)
+    netOtherSources -= absorbedFromOS
+    remainingLoss -= absorbedFromOS
+
+    // Then offset against STCG
+    const absorbedFromSTCG = Math.min(remainingLoss, netSTCGAfterBusLoss)
+    netSTCGAfterBusLoss -= absorbedFromSTCG
+    remainingLoss -= absorbedFromSTCG
+
+    // Then offset against LTCG
+    const absorbedFromLTCG = Math.min(remainingLoss, netLTCGAfterBusLoss)
+    netLTCGAfterBusLoss -= absorbedFromLTCG
+    remainingLoss -= absorbedFromLTCG
+
+    // Any remaining loss carries forward (handled in CFL)
+  } else if (fnoTaxableIncome > 0) {
+    // F&O profit adds to slab income — included via netOtherSources for simplicity in v1
+    netOtherSources += fnoTaxableIncome
+  }
+
   // ── Capital gains set-off ─────────────────────────────────────────────────
   // Intra-CG set-off was already done in computeScheduleCG.
   // Any remaining STCL or LTCL that could not be absorbed within CG
   // cannot cross into salary or other sources — carry forward in CFL.
-  //
-  // scheduleCG.netSTCG and netLTCG are post-intra-CG-set-off values.
-  // We record remaining losses for CFL.
 
   // The intra-CG set-off may have left residual losses — compute them:
   const intracgSTCLUsed = Math.min(scheduleCG.stcl, scheduleCG.grossSTCG)
@@ -69,12 +98,9 @@ export function computeScheduleCYLA(
   // Intraday: if profit, it's slab income; if loss, it's zero (loss carried forward)
   const netIntradayIncome = Math.max(0, intradayPnL)
 
-  // CG: use the intra-CG-adjusted values from scheduleCG
-  const netSTCG = scheduleCG.netSTCG
-  const netLTCG = scheduleCG.netLTCG
-
-  // Other sources: not reduced by CG/intraday losses
-  const netOtherSources = scheduleOS.total
+  // CG: use the intra-CG-adjusted values, further reduced by F&O loss if applicable
+  const netSTCG = netSTCGAfterBusLoss
+  const netLTCG = netLTCGAfterBusLoss
 
   return {
     setOffs: {

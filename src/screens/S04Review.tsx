@@ -361,12 +361,25 @@ function BusinessTab({ s, sv2, broker, overrides }: { s: any; sv2: any; broker: 
 
       {hasFnO && (
         <ScheduleSection title="F&O" source="Broker P&L">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-            <p className="font-medium">⚠ F&O income detected — computation skipped.</p>
-            <p className="text-xs mt-1">Enter taxable F&O income manually after consulting a CA.</p>
-          </div>
+          {!overrides['BP.fnoIncome'] && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+              <p className="font-medium">⚠ F&O income detected — enter taxable income below.</p>
+              <p className="text-xs mt-1">Enter taxable F&O income (profit or loss) after consulting a CA. Loss will be auto set-off against other income heads.</p>
+            </div>
+          )}
+          {overrides['BP.fnoIncome'] && overrides['BP.fnoIncome'] < 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+              <p className="font-medium">F&O loss of ₹{Math.abs(overrides['BP.fnoIncome']).toLocaleString('en-IN')} will be set off against Other Sources and Capital Gains.</p>
+              <p className="text-xs mt-1">Non-speculative business loss can offset any head except salary.</p>
+            </div>
+          )}
+          {overrides['BP.fnoIncome'] && overrides['BP.fnoIncome'] > 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-800">
+              <p className="font-medium">F&O profit of ₹{overrides['BP.fnoIncome'].toLocaleString('en-IN')} added to taxable income at slab rates.</p>
+            </div>
+          )}
           <div className="mt-2">
-            <EditableField label="F&O taxable income (manual)" fieldPath="BP.fnoIncome"
+            <EditableField label="F&O taxable income (profit +ve / loss -ve)" fieldPath="BP.fnoIncome"
               value={overrides['BP.fnoIncome'] ?? 0} isOverridden={'BP.fnoIncome' in overrides} />
           </div>
         </ScheduleSection>

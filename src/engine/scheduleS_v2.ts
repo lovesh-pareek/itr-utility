@@ -4,8 +4,9 @@ import { getRules } from './taxRules'
 /**
  * Compute Schedule S v2 — Multi-employer salary income.
  *
- * Each employer contributes: gross salary, standard deduction (fixed ₹75,000
- * under New Regime per employer), professional tax, net taxable salary, TDS.
+ * Standard deduction: a SINGLE fixed deduction (₹75,000 for AY 2026-27)
+ * applied to aggregate salary income regardless of number of employers.
+ * For display, it is attributed to the first employer (or proportionally if needed).
  *
  * Overrides keyed as: `S_v2.{employerId}.grossSalary`, etc.
  */
@@ -16,32 +17,60 @@ export function computeScheduleS_v2(
   regime: 'new' | 'old' = 'new'
 ): ScheduleS_v2 {
   const rules = getRules(ay, regime)
-  const STD_DEDUCTION = rules.standardDeductionSalary  // 75000 from config
+  const STD_DEDUCTION = rules.standardDeductionSalary  // 75000 from config — applied ONCE total
 
+  // First pass: resolve gross salary, professional tax, TDS per employer
   const resolvedEmployers: EmployerEntry[] = employers.map(emp => {
     const prefix = `S_v2.${emp.id}`
     const gross = overrides[`${prefix}.grossSalary`] ?? emp.grossSalary
     const profTax = overrides[`${prefix}.professionalTax`] ?? emp.professionalTax
     const tds = overrides[`${prefix}.tdsDeducted`] ?? emp.tdsDeducted
-    // Standard deduction is fixed per employer under New Regime — not overridable
-    const stdDed = STD_DEDUCTION
-    const netTaxable = overrides[`${prefix}.netTaxableSalary`] ?? Math.max(0, gross - stdDed - profTax)
 
     return {
       ...emp,
       grossSalary: gross,
-      standardDeduction: stdDed,
+      standardDeduction: 0,  // will be set below
       professionalTax: profTax,
-      netTaxableSalary: netTaxable,
+      netTaxableSalary: 0,   // will be computed below
       tdsDeducted: tds,
     }
   })
 
   const totalGross = resolvedEmployers.reduce((s, e) => s + e.grossSalary, 0)
-  const totalStdDeduction = resolvedEmployers.reduce((s, e) => s + e.standardDeduction, 0)
   const totalProfessionalTax = resolvedEmployers.reduce((s, e) => s + e.professionalTax, 0)
-  const totalNetTaxable = resolvedEmployers.reduce((s, e) => s + e.netTaxableSalary, 0)
   const totalTDS = resolvedEmployers.reduce((s, e) => s + e.tdsDeducted, 0)
+
+  // Standard deduction is applied ONCE to aggregate salary (capped at gross salary)
+  const totalStdDeduction = Math.min(STD_DEDUCTION, totalGross)
+
+  // Compute aggregate net taxable salary
+  const totalNetTaxable = overrides['S_v2.totalNetTaxable']
+    ?? Math.max(0, totalGross - totalStdDeduction - totalProfessionalTax)
+
+  // Attribute standard deduction to first employer for display
+  // (ITR forms show it as a single line item, not per employer)
+  if (resolvedEmployers.length > 0) {
+    resolvedEmployers[0].standardDeduction = totalStdDeduction
+  }
+
+  // Per-employer net taxable: distribute proportionally for display
+  if (resolvedEmployers.length === 1) {
+    resolvedEmployers[0].netTaxableSalary = totalNetTaxable
+  } else {
+    // Proportional distribution based on gross salary share
+    let allocated = 0
+    for (let i = 0; i < resolvedEmployers.length; i++) {
+      const emp = resolvedEmployers[i]
+      if (i === resolvedEmployers.length - 1) {
+        // Last employer gets the remainder to avoid rounding errors
+        emp.netTaxableSalary = totalNetTaxable - allocated
+      } else {
+        const share = totalGross > 0 ? emp.grossSalary / totalGross : 0
+        emp.netTaxableSalary = Math.round(totalNetTaxable * share)
+        allocated += emp.netTaxableSalary
+      }
+    }
+  }
 
   return {
     employers: resolvedEmployers,

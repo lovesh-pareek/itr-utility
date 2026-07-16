@@ -82,9 +82,9 @@ describe('T66 — computeScheduleS_v2', () => {
     const emp2 = makeEmployer({ id: 'emp_2', employerName: 'Beta Corp', grossSalary: 600_000, professionalTax: 0, tdsDeducted: 40_000 })
     const result = computeScheduleS_v2([emp1, emp2], {})
     expect(result.totalGross).toBe(1_400_000)
-    expect(result.totalStdDeduction).toBe(150_000)    // 75k × 2
+    expect(result.totalStdDeduction).toBe(75_000)     // single deduction across all employers
     expect(result.totalProfessionalTax).toBe(2_400)
-    expect(result.totalNetTaxable).toBe(1_400_000 - 150_000 - 2_400)  // 1,247,600
+    expect(result.totalNetTaxable).toBe(1_400_000 - 75_000 - 2_400)  // 1,322,600
     expect(result.totalTDS).toBe(100_000)
   })
 
@@ -95,7 +95,7 @@ describe('T66 — computeScheduleS_v2', () => {
     expect(result.totalNetTaxable).toBe(1_500_000 - 75_000 - 2_400)
   })
 
-  it('standard deduction is fixed at 75000 per employer — not overridable', () => {
+  it('standard deduction is fixed at 75000 total — not overridable', () => {
     const emp = makeEmployer({ id: 'emp_1' })
     const result = computeScheduleS_v2([emp], {})
     expect(result.employers[0].standardDeduction).toBe(75_000)

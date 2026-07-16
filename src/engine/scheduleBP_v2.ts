@@ -53,11 +53,18 @@ export function computeScheduleBP_v2(
   // F&O — user-entered, not computed
   const resolvedFnO: FnOEntry | null = fno
     ? {
-        turnover: overrides['BP_v2.fno.turnover'] ?? fno.turnover,
-        taxableIncome: overrides['BP_v2.fno.taxableIncome'] ?? fno.taxableIncome,
-        notComputed: true,
+        turnover: overrides['BP_v2.fno.turnover'] ?? overrides['BP.fnoTurnover'] ?? fno.turnover,
+        taxableIncome: overrides['BP_v2.fno.taxableIncome'] ?? overrides['BP.fnoIncome'] ?? fno.taxableIncome,
+        notComputed: fno.notComputed && !('BP_v2.fno.taxableIncome' in overrides) && !('BP.fnoIncome' in overrides),
       }
-    : null
+    : // If no fno entry exists but user provided an override, create an entry
+      ('BP.fnoIncome' in overrides || 'BP_v2.fno.taxableIncome' in overrides)
+        ? {
+            turnover: overrides['BP_v2.fno.turnover'] ?? overrides['BP.fnoTurnover'] ?? 0,
+            taxableIncome: overrides['BP_v2.fno.taxableIncome'] ?? overrides['BP.fnoIncome'] ?? 0,
+            notComputed: false,
+          }
+        : null
 
   const resolvedNonSpecIncome = overrides['BP_v2.nonSpeculativeIncome'] ?? nonSpeculativeIncome
   const resolvedNonSpecLoss = overrides['BP_v2.nonSpeculativeLoss'] ?? nonSpeculativeLoss

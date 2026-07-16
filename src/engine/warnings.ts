@@ -36,9 +36,9 @@ export function computeWarnings(
   if (state.parsed.broker?.hasFnO) {
     warnings.push({
       id: 'FNO_DETECTED',
-      severity: 'warn',
+      severity: 'info',
       message:
-        'F&O income detected — not computed in v1.0. Consult a CA before filing.',
+        'F&O income detected. Enter taxable F&O income in the Business tab — loss will be auto set-off against other heads.',
     })
   }
 
@@ -67,9 +67,9 @@ export function computeWarnings(
     if (schedules.BP.netSpeculativePnL < 0) {
       warnings.push({
         id: 'INTRADAY_LOSS_RESTRICTION',
-        severity: 'warn',
+        severity: 'info',
         message:
-          'Intraday loss cannot be set off against salary or capital gains. It can only offset intraday profit.',
+          'Intraday (speculative) loss is ring-fenced — it can only offset intraday profit. This loss will be carried forward for up to 4 years.',
         scheduleRef: 'BP',
       })
     }

@@ -122,11 +122,16 @@ export function computeRegimeComparison(
 /**
  * Extract the four income components needed by computeTax_v2 from Schedules_v2.
  *
- * slabIncome          = salary (net taxable) + intraday P&L + other sources at slab rate
- *                       + debt MF gains + HP income (regime-dependent set-off already applied)
- * stcg                = net STCG after intra-CG set-off (equity + equity MF + property)
- * ltcg                = taxable LTCG above exemption limit
- * netLTCGForSurcharge = gross LTCG before exemption (for total income calc)
+ * Implements business loss set-off rules:
+ *   - Speculative loss: ring-fenced (only against speculative profit)
+ *   - Non-speculative business loss (incl. F&O): can offset OS, STCG, LTCG, HP (not salary)
+ *
+ * slabIncome          = salary (net taxable) + speculative profit + presumptive
+ *                       + non-speculative profit + OS at slab (after set-off)
+ *                       + debt MF gains + HP income (regime-dependent)
+ * stcg                = net STCG after business loss set-off and intra-CG set-off
+ * ltcg                = taxable LTCG after business loss set-off and exemption
+ * netLTCGForSurcharge = LTCG for total income surcharge calculation
  */
 function extractIncomeComponents(s: Schedules_v2): {
   slabIncome: number
@@ -137,35 +142,58 @@ function extractIncomeComponents(s: Schedules_v2): {
   // Salary net taxable
   const salaryNet = s.S.totalNetTaxable ?? 0
 
-  // Intraday (speculative) — may be negative (loss)
-  const intradayPL = (s.BP as any)?.speculativeIncome ?? (s.BP as any)?.speculativePL ?? 0
+  // Speculative (intraday): ring-fenced — loss cannot offset other heads
+  const speculativeProfit = Math.max(0, s.BP?.netSpeculativePnL ?? 0)
 
-  // Presumptive + non-speculative business income
+  // Presumptive business income
   const presumptiveIncome = ((s.BP as any)?.presumptiveEntries ?? [])
     .reduce((sum: number, e: any) => sum + (e.presumptiveIncome ?? 0), 0)
-  const nonSpecIncome = (s.BP as any)?.nonSpeculativeIncome ?? 0
 
-  // Other sources — slab rate portion
-  const otherSlabRate = s.OS?.totalAtSlabRate ?? 0
+  // F&O income/loss is non-speculative business income.
+  // Combine with other non-speculative income/loss.
+  const fnoIncome = s.BP?.fno?.taxableIncome ?? 0
+  const nonSpecIncomeRaw = (s.BP?.nonSpeculativeIncome ?? 0) - (s.BP?.nonSpeculativeLoss ?? 0)
+  const netNonSpec = nonSpecIncomeRaw + fnoIncome
+  const nonSpecProfit = Math.max(0, netNonSpec)
+  const nonSpecLoss = Math.max(0, -netNonSpec)
 
-  // House property — set-off already computed in scheduleHP
-  const hpIncome = s.HP?.totalIncomeFromHP ?? 0
-  const hpSetOff = s.HP?.lossSetOffAgainstSalary ?? 0
-  // Use net HP contribution (positive income or loss already set off)
-  const netHP = hpIncome + hpSetOff  // lossSetOffAgainstSalary is negative when loss
+  // Other sources — slab rate portion (may be reduced by business loss set-off)
+  let otherSlabRate = s.OS?.totalAtSlabRate ?? 0
 
-  // Capital gains — net after intra-CG CYLA
-  const cgStcg = s.CG?.totalSTCG ?? 0
-  const cgLtcg = s.CG?.totalLTCG ?? 0
+  // Capital gains — net after intra-CG set-off
+  let cgStcg = s.CG?.totalSTCG ?? 0
+  let cgLtcg = s.CG?.totalLTCG ?? 0
+
+  // Non-speculative business loss set-off: OS → STCG → LTCG (not salary)
+  let remainingLoss = nonSpecLoss
+  if (remainingLoss > 0) {
+    const absorbedOS = Math.min(remainingLoss, otherSlabRate)
+    otherSlabRate -= absorbedOS
+    remainingLoss -= absorbedOS
+
+    const absorbedSTCG = Math.min(remainingLoss, cgStcg)
+    cgStcg -= absorbedSTCG
+    remainingLoss -= absorbedSTCG
+
+    const absorbedLTCG = Math.min(remainingLoss, cgLtcg)
+    cgLtcg -= absorbedLTCG
+    remainingLoss -= absorbedLTCG
+  }
 
   // Debt MF gains at slab rate
   const debtMFGains = (s.CG as any)?.debtMFGains ?? 0
 
+  // House property — set-off already computed in scheduleHP
+  const hpIncome = s.HP?.totalIncomeFromHP ?? 0
+  const hpSetOff = s.HP?.lossSetOffAgainstSalary ?? 0
+  // Net HP contribution (positive income or loss already set off via lossSetOffAgainstSalary)
+  const netHP = hpIncome + hpSetOff  // lossSetOffAgainstSalary is negative when loss
+
   const slabIncome = Math.max(0,
     salaryNet +
-    intradayPL +
+    speculativeProfit +
     presumptiveIncome +
-    nonSpecIncome +
+    nonSpecProfit +
     otherSlabRate +
     debtMFGains +
     netHP

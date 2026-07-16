@@ -52,26 +52,48 @@ export function computeTotalIncome_v2(
   // New Regime: HP loss is ring-fenced (hpIncome stays negative but not set off)
 
   // Business income components
+  // Speculative (intraday): ring-fenced — loss cannot offset other heads
   const businessSpeculative = Math.max(0, BP.netSpeculativePnL)
   const businessPresumptive = getTotalPresumptiveIncome(BP.presumptiveEntries)
-  const businessFnO = BP.fno?.taxableIncome ?? 0
-  const netNonSpec = getNetNonSpeculativeIncome(BP)
+
+  // F&O income/loss is non-speculative business income per Indian tax law.
+  // Combine F&O with other non-speculative business income/loss into a single pool.
+  const fnoIncome = BP.fno?.taxableIncome ?? 0
+  const netNonSpec = getNetNonSpeculativeIncome(BP) + fnoIncome
+
+  // Positive non-speculative income goes to slab; negative becomes loss for set-off
   const businessNonSpeculative = Math.max(0, netNonSpec)
   const nonSpecLoss = Math.max(0, -netNonSpec)
 
-  // Non-speculative loss can offset non-salary heads
+  // Non-speculative business loss set-off (can offset any head EXCEPT salary):
+  //   Order: Other Sources → STCG → LTCG → HP income (Old Regime)
   let cgSTCGBase = CG.totalSTCG
   let cgLTCGBase = CG.totalLTCG
+  let otherSourcesSlabRate = OS.totalAtSlabRate
   let remainingNonSpecLoss = nonSpecLoss
 
   if (remainingNonSpecLoss > 0) {
+    // First: set off against Other Sources (slab rate portion)
+    const absorbedFromOS = Math.min(remainingNonSpecLoss, otherSourcesSlabRate)
+    otherSourcesSlabRate -= absorbedFromOS
+    remainingNonSpecLoss -= absorbedFromOS
+
+    // Then: set off against STCG
     const absorbedFromSTCG = Math.min(remainingNonSpecLoss, cgSTCGBase)
     cgSTCGBase -= absorbedFromSTCG
     remainingNonSpecLoss -= absorbedFromSTCG
 
+    // Then: set off against LTCG
     const absorbedFromLTCG = Math.min(remainingNonSpecLoss, cgLTCGBase)
     cgLTCGBase -= absorbedFromLTCG
     remainingNonSpecLoss -= absorbedFromLTCG
+
+    // Old Regime: can also offset against HP income (positive only)
+    if (regime === 'old' && remainingNonSpecLoss > 0 && hpIncome > 0) {
+      const absorbedFromHP = Math.min(remainingNonSpecLoss, hpIncome)
+      hpIncome -= absorbedFromHP
+      remainingNonSpecLoss -= absorbedFromHP
+    }
   }
 
   // CG loss set-off (STCL/LTCL are already in CG.stcl/ltcl from ScheduleCG)
@@ -79,19 +101,22 @@ export function computeTotalIncome_v2(
   const cgSTCG = cgSTCGBase
   const cgLTCG = cgLTCGBase  // taxableLTCG already applied exemption
 
-  const otherSourcesSlabRate = OS.totalAtSlabRate
   const otherSourcesFlat30 = OS.totalAt30Pct
+  const debtMFGains = ((CG as any).debtMFGains ?? 0) as number
+
+  // F&O income for reporting: positive portion already in businessNonSpeculative,
+  // negative already absorbed via set-off. Report the raw value for display.
+  const businessFnO = fnoIncome
 
   // Total slab income: salary (after HP set-off) + speculative profit + presumptive +
-  //   non-speculative + OS slab + debt MF gains
+  //   non-speculative (incl. F&O net positive) + OS slab (after set-off) + debt MF gains
   const totalSlabIncome =
     salaryIncome +
     businessSpeculative +
     businessPresumptive +
-    businessFnO +
     businessNonSpeculative +
     otherSourcesSlabRate +
-    (CG as any).debtMFGains || 0
+    debtMFGains
 
   const totalIncome =
     totalSlabIncome +
@@ -229,8 +254,8 @@ export function computeWarnings_v2(
   if (BP.fno && BP.fno.notComputed) {
     warnings.push({
       id: 'FNO_NOT_COMPUTED' as WarningId,
-      severity: 'warn' as WarningSeverity,
-      message: 'F&O income detected but not computed. Enter taxable F&O income manually after consulting a CA.',
+      severity: 'info' as WarningSeverity,
+      message: 'F&O income detected. Enter taxable F&O income (profit or loss) in the Business tab — it will be auto set-off against other income heads.',
     })
   }
 

@@ -88,12 +88,16 @@ async function parsePriorITRJSON(file: File): Promise<CFLEntry[]> {
 }
 
 function extractAYFromJSON(raw: any): string {
-  // Try common paths
+  // Try common paths for IT Portal JSON format
   const candidates = [
     raw?.ITR?.ITR3?.PersonalInfo?.AssessmentYear,
     raw?.ITR?.ITR2?.PersonalInfo?.AssessmentYear,
     raw?.ITR?.ITR4?.PersonalInfo?.AssessmentYear,
     raw?.ITR?.ITR1?.PersonalInfo?.AssessmentYear,
+    raw?.ITR?.ITR3?.Form_ITR3?.AssessmentYear,
+    raw?.ITR?.ITR2?.Form_ITR2?.AssessmentYear,
+    raw?.ITR?.ITR4?.Form_ITR4?.AssessmentYear,
+    raw?.ITR?.ITR1?.Form_ITR1?.AssessmentYear,
     raw?.PersonalInfo?.AssessmentYear,
     raw?.AssessmentYear,
     raw?.assessmentYear,
@@ -102,9 +106,18 @@ function extractAYFromJSON(raw: any): string {
   ]
 
   for (const c of candidates) {
-    if (c && typeof c === 'string') {
-      const match = String(c).match(/(\d{4})[- ]?(\d{2})/)
-      if (match) return `${match[1]}-${match[2]}`
+    if (c === undefined || c === null) continue
+    const s = String(c).trim()
+
+    // Format: "2024-25" or "2024-2025"
+    const matchDash = s.match(/(\d{4})[- ](\d{2,4})/)
+    if (matchDash) return `${matchDash[1]}-${matchDash[2].slice(-2)}`
+
+    // Format: just a year like "2025" — IT Portal uses AY start year
+    const matchYear = s.match(/^(\d{4})$/)
+    if (matchYear) {
+      const yr = parseInt(matchYear[1])
+      return `${yr}-${String(yr + 1).slice(-2)}`
     }
   }
 
@@ -146,11 +159,21 @@ function deepFind(obj: any, key: string, depth = 0): any {
 function extractCFLFromJSON(cfl: any, priorAY: string, yearsElapsed: number): CFLEntry[] {
   const entries: CFLEntry[] = []
 
+  // IT Portal JSON nests losses under TotalLossCFSummary.LossSummaryDetail
+  // or CurrentAYloss.LossSummaryDetail. Flatten these into the search scope.
+  const searchTargets = [
+    cfl,
+    cfl?.TotalLossCFSummary?.LossSummaryDetail,
+    cfl?.TotalLossCFSummary,
+    cfl?.CurrentAYloss?.LossSummaryDetail,
+    cfl?.CurrentAYloss,
+    cfl?.LossSummaryDetail,
+  ].filter(Boolean)
+
   // ── Speculative (Intraday) Loss ─────────────────────────────────────────────
-  // IT Portal JSON field names vary — try multiple
-  const specLoss = numField(cfl, [
-    'LossCFSpecBus', 'SpeculativeLoss', 'IntraDayLoss', 'LossFrmSpecBus',
-    'TotLossCFSpecBus', 'SpeculativeBusinessLoss',
+  const specLoss = numFieldMulti(searchTargets, [
+    'LossFrmSpecBusCF', 'LossCFSpecBus', 'SpeculativeLoss', 'IntraDayLoss',
+    'LossFrmSpecBus', 'TotLossCFSpecBus', 'SpeculativeBusinessLoss',
   ])
   if (specLoss > 0) {
     const remaining = carryForwardConfig.speculativeLoss - yearsElapsed
@@ -165,9 +188,9 @@ function extractCFLFromJSON(cfl: any, priorAY: string, yearsElapsed: number): CF
   }
 
   // ── Short-term Capital Loss ─────────────────────────────────────────────────
-  const stcl = numField(cfl, [
-    'LossCFSTC', 'ShortTermCapLoss', 'STCL', 'ShortTermLoss',
-    'TotLossCFSTC', 'LossFrmSTC',
+  const stcl = numFieldMulti(searchTargets, [
+    'TotalSTCGPTILossCF', 'LossCFSTC', 'ShortTermCapLoss', 'STCL',
+    'ShortTermLoss', 'TotLossCFSTC', 'LossFrmSTC',
   ])
   if (stcl > 0) {
     const remaining = carryForwardConfig.capitalLoss - yearsElapsed
@@ -182,9 +205,9 @@ function extractCFLFromJSON(cfl: any, priorAY: string, yearsElapsed: number): CF
   }
 
   // ── Long-term Capital Loss ──────────────────────────────────────────────────
-  const ltcl = numField(cfl, [
-    'LossCFLTC', 'LongTermCapLoss', 'LTCL', 'LongTermLoss',
-    'TotLossCFLTC', 'LossFrmLTC',
+  const ltcl = numFieldMulti(searchTargets, [
+    'TotalLTCGPTILossCF', 'LossCFLTC', 'LongTermCapLoss', 'LTCL',
+    'LongTermLoss', 'TotLossCFLTC', 'LossFrmLTC',
   ])
   if (ltcl > 0) {
     const remaining = carryForwardConfig.capitalLoss - yearsElapsed
@@ -199,9 +222,9 @@ function extractCFLFromJSON(cfl: any, priorAY: string, yearsElapsed: number): CF
   }
 
   // ── House Property Loss ─────────────────────────────────────────────────────
-  const hpLoss = numField(cfl, [
-    'LossCFHP', 'HPLoss', 'HousePropLoss', 'LossFrmHP',
-    'TotLossCFHP', 'HousePropertyLoss',
+  const hpLoss = numFieldMulti(searchTargets, [
+    'TotalHPPTILossCF', 'LossCFHP', 'HPLoss', 'HousePropLoss',
+    'LossFrmHP', 'TotLossCFHP', 'HousePropertyLoss',
   ])
   if (hpLoss > 0) {
     const remaining = carryForwardConfig.hpLoss - yearsElapsed
@@ -216,9 +239,9 @@ function extractCFLFromJSON(cfl: any, priorAY: string, yearsElapsed: number): CF
   }
 
   // ── Non-speculative Business Loss ───────────────────────────────────────────
-  const busLoss = numField(cfl, [
-    'LossCFBusiness', 'BusinessLoss', 'NonSpecBusLoss', 'OthBusLoss',
-    'TotLossCFBusiness', 'LossFrmOthBus',
+  const busLoss = numFieldMulti(searchTargets, [
+    'BusLossOthThanSpecLossCF', 'LossCFBusiness', 'BusinessLoss',
+    'NonSpecBusLoss', 'OthBusLoss', 'TotLossCFBusiness', 'LossFrmOthBus',
   ])
   if (busLoss > 0) {
     const remaining = carryForwardConfig.businessLoss - yearsElapsed
@@ -363,6 +386,15 @@ function numField(obj: any, candidates: string[]): number {
       const n = parseFloat(String(val).replace(/,/g, ''))
       if (!isNaN(n) && n > 0) return n
     }
+  }
+  return 0
+}
+
+/** Search across multiple objects for field name candidates */
+function numFieldMulti(targets: any[], candidates: string[]): number {
+  for (const obj of targets) {
+    const val = numField(obj, candidates)
+    if (val > 0) return val
   }
   return 0
 }

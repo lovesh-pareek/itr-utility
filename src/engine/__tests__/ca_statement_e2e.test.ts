@@ -2,12 +2,12 @@
  * End-to-End Test: CA's Statement of Income Verification
  *
  * This test uses the ACTUAL figures from the sample documents:
- *   - Form 16 (NEEYAMOWORKS TECHNOLOGIES PVT LTD)
+ *   - Form 16 (FINANCEWORKS TECHNOLOGIES PVT LTD)
  *   - Zerodha Broker P&L (intraday, equity delivery, F&O)
  *   - AIS (interest income, dividends)
  *   - Prior ITR JSON (AY 2025-26 carry forward: speculative loss ₹114)
  *
- * Expected output per CA's Statement of Income (PAN: CPLPP2726Q, AY 2026-27):
+ * Expected output per CA's Statement of Income (PAN: TPNDD2456D, AY 2026-27):
  *   Salary (net):       ₹40,42,080
  *   Business loss:      -₹51,681 (non-speculative, from F&O)
  *   Speculative loss:   -₹1,726 (ring-fenced, carry forward)
@@ -68,8 +68,8 @@ const SALARY = {
   professionalTax: 0,
   netTaxableSalary: 4_042_080,
   tdsDeducted: 827_274,
-  employerName: 'NEEYAMOWORKS TECHNOLOGIES PRIVATE LIMITED',
-  tanEmployer: 'CHEN06776A',
+  employerName: 'FINANCEWORKS TECHNOLOGIES PRIVATE LIMITED',
+  tanEmployer: 'PUNE8736S',
 }
 
 const BROKER_DATA = {
